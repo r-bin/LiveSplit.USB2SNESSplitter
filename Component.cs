@@ -402,7 +402,7 @@ namespace LiveSplit.UI.Components
 
         private bool IsConnectionReady()
         {
-            Debug.WriteLine("Checking connection");
+            // Debug.WriteLine("Checking connection");
             if (_proto_state == ProtocolState.ATTACHED)
                 return true;
 
@@ -420,7 +420,7 @@ namespace LiveSplit.UI.Components
         private async void UpdateSplitsWrapper()
         {
 
-            Debug.WriteLine("Timer tick " + DateTime.Now);
+            // Debug.WriteLine("Timer tick " + DateTime.Now);
             // "_inTimer" is a very questionable attempt at locking, but it's probably fine here.
             if (_inTimer)
             {
@@ -448,16 +448,6 @@ namespace LiveSplit.UI.Components
                 return;
             }
 
-            if (_state.CurrentPhase == TimerPhase.NotRunning)
-            {
-                await CheckAutostart();
-            } else if (_state.CurrentPhase == TimerPhase.Running) {
-                await CheckSplits();
-            }
-        }
-
-        private async Task CheckAutostart()
-        {
             if (!IsConfigReady())
             {
                 return;
@@ -466,20 +456,18 @@ namespace LiveSplit.UI.Components
             {
                 _update_timer.Interval = 1000;
                 return;
-            } else
+            }
+            else
             {
                 _update_timer.Interval = 33;
             }
+
             if (_game == null)
             {
                 return;
             }
 
-            bool ok = await CheckSplit(_autostart);
-            if (ok)
-            {
-                _model.Start();
-            }
+            await CheckSplits();
         }
 
         private bool IsConfigReady()
@@ -499,6 +487,12 @@ namespace LiveSplit.UI.Components
                             SetSplitList();
                             SetAutostart();
                             _valid_config = true;
+
+                            Debug.WriteLine($"{_splits.Count} splits detected:");
+                            foreach (var split in _splits)
+                            {
+                                Debug.WriteLine($"- {split.Name}");
+                            }
                         } catch(Exception e)
                         {
                             Debug.WriteLine("Splits could not be parsed: " + e.ToString());
@@ -515,38 +509,21 @@ namespace LiveSplit.UI.Components
             return true;
         }
 
-        async Task<bool> CheckSplit(Split split)
-        {
-            byte[] data;
-            try
-            {
-                data = await _usb2snes.GetAddress(split.AddressInt.ToWramAddress(), DEFAULT_READ_SIZE);
-            }
-            catch
-            {
-                return false;
-            }
-            if (data.Count() == 0)
-            {
-                Console.WriteLine("Get address failed to return result");
-                return false;
-            }
-            return split.Check(data);
-        }
-
         private async Task CheckSplits()
         {
-            if (_splits.Count() == 0)
+            Split split;
+            if (_state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
             {
-                Console.WriteLine("No splits available.");
-                return;
+                split = _autostart;
             }
-            if (_splits.ElementAtOrDefault(_state.CurrentSplitIndex) == null)
+            else if (_state.CurrentPhase == TimerPhase.Running)
+            {
+                split = _splits[_state.CurrentSplitIndex];
+            } else
             {
                 return;
             }
 
-            var split = _splits[_state.CurrentSplitIndex];
             var orignSplit = split;
             if (split.Next != null && split.PosToCheck != 0)
             {
@@ -580,10 +557,32 @@ namespace LiveSplit.UI.Components
 
             if (ok)
             {
-                DoSplit();
+                if(orignSplit == _autostart)
+                {
+                    _model.Start();
+                } else {
+                    DoSplit();
+                }
             }
         }
-
+        async Task<bool> CheckSplit(Split split)
+        {
+            byte[] data;
+            try
+            {
+                data = await _usb2snes.GetAddress(split.AddressInt.ToWramAddress(), DEFAULT_READ_SIZE);
+            }
+            catch
+            {
+                return false;
+            }
+            if (data.Count() == 0)
+            {
+                Console.WriteLine("Get address failed to return result");
+                return false;
+            }
+            return split.Check(data);
+        }
 
         public void DrawHorizontal(Graphics g, LiveSplitState state, float height, Region clipRegion)
         {
