@@ -28,7 +28,7 @@ namespace LiveSplit.UI.Components
 
             return USB2SNESComponent.SD2SNES_WRAM_BASE_ADDRESS + (i & 0xffff);
         }
-        public static uint ParseWithFormat(this String numberString)
+        public static uint ToFormattedUInt32(this String numberString)
         {
             return Convert.ToUInt32(numberString, numberString.StartsWith("0x") ? 16 : 10);
         }
@@ -56,63 +56,58 @@ namespace LiveSplit.UI.Components
         internal class Split
         {
             public string Name { get; set; }
-            public string Alias { get; set; }
             public string Address { get; set; }
             public string Value { get; set; }
             public string Type { get; set; }
+            public string Active { get; set; }
             public List<Split> More { get; set; }
             public List<Split> Next { get; set; }
             public int PosToCheck { get; set; } = 0;
 
-            public uint AddressInt { get { return Address.ParseWithFormat(); } }
-            public uint ValueInt { get { return Value.ParseWithFormat(); } }
+            public uint AddressInt { get { return Address.ToFormattedUInt32(); } }
+            public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
 
+            public uint? PreviousValueInt { get; set; }
 
-            public bool check(uint value, uint word)
+            public bool Check(byte[] data)
             {
-                bool ret = false;
-                switch (this.Type)
+                var types = new Dictionary<string, Func<byte[], uint>>()
                 {
-                    case "bit":
-                        if ((value & this.ValueInt) != 0) { ret = true; }
-                        break;
-                    case "eq":
-                        if (value == this.ValueInt) { ret = true; }
-                        break;
-                    case "gt":
-                        if (value > this.ValueInt) { ret = true; }
-                        break;
-                    case "lt":
-                        if (value < this.ValueInt) { ret = true; }
-                        break;
-                    case "gte":
-                        if (value >= this.ValueInt) { ret = true; }
-                        break;
-                    case "lte":
-                        if (value <= this.ValueInt) { ret = true; }
-                        break;
-                    case "wbit":
-                        if ((word & this.ValueInt) != 0) { ret = true; }
-                        break;
-                    case "weq":
-                        if (word == this.ValueInt) { ret = true; }
-                        break;
-                    case "wgt":
-                        if (word > this.ValueInt) { ret = true; }
-                        break;
-                    case "wlt":
-                        if (word < this.ValueInt) { ret = true; }
-                        break;
-                    case "wgte":
-                        if (word >= this.ValueInt) { ret = true; }
-                        break;
-                    case "wlte":
-                        if (word <= this.ValueInt) { ret = true; }
-                        break;
-                }
-                return ret;
-            }
+                    { "byte", array => (uint)array[0] },
+                    { "short", array => (uint)(array[0] + (array[1] << 8)) },
+                };
+                var operators = new Dictionary<string, Func<uint, Split, int?, bool>>()
+                {
+                    { "&", (v, s, d) => (v & s.ValueInt) == v },
+                    { "==", (v, s, d) => v == s.ValueInt },
+                    { ">", (v, s, d) => v > s.ValueInt },
+                    { "<", (v, s, d) => v < s.ValueInt },
+                    { ">=", (v, s, d) => v >= s.ValueInt },
+                    { "<=", (v, s, d) => v <= s.ValueInt },
+                    { "delta", (v, s, d) => d.HasValue && d >= s.ValueInt },
+                    { "odelta", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
+                };
 
+                if (!types.TryGetValue(this.Type, out Func<byte[], uint> type))
+                {
+                    type = types["short"];
+                }
+                uint value = type(data);
+
+                int? delta = null;
+                if (this.PreviousValueInt.HasValue)
+                {
+                    delta = (int)value - (int)this.PreviousValueInt;
+                }
+
+                bool result = operators[this.Type](value, this, delta);
+
+                // Console.WriteLine($"split[{this.Name}][{_state.CurrentSplitIndex}/{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+
+                this.PreviousValueInt = value;
+
+                return result;
+            }
         }
 
         class Category
@@ -124,21 +119,9 @@ namespace LiveSplit.UI.Components
         class Game
         {
             public string Name { get; set; }
-            public Autostart Autostart { get; set; }
-            public Dictionary<String, String> Alias { get; set; }
+            public string Autostart { get; set; }
             public List<Category> Categories { get; set; }
             public List<Split> Definitions { get; set; }
-        }
-
-        class Autostart
-        {
-            public string Active { get; set; }
-            public string Address { get; set; }
-            public string Value { get; set; }
-            public string Type { get; set; }
-
-            public uint AddressInt { get { return Address.ParseWithFormat(); } }
-            public uint ValueInt { get { return Value.ParseWithFormat(); } }
         }
 
         public string ComponentName => "USB2SNES Auto Splitter";
@@ -166,7 +149,8 @@ namespace LiveSplit.UI.Components
         private LiveSplitState _state;
         private TimerModel _model;
         private Game _game;
-        private List<string> _splits;
+        private Split _autostart;
+        private List<Split> _splits;
         private MyState _mystate;
         private ProtocolState _proto_state;
         private bool _inTimer;
@@ -187,7 +171,7 @@ namespace LiveSplit.UI.Components
             _model = new TimerModel() { CurrentState = _state };
             _state.RegisterTimerModel(_model);
             _stateChanged = false;
-            _splits = null;
+            _splits = new List<Split>();
             _inTimer = false;
             _config_checked = false;
             _valid_config = false;
@@ -245,7 +229,7 @@ namespace LiveSplit.UI.Components
             if (!devices.Contains(_settings.Device))
             {
                 if (prevState == ProtocolState.NONE)
-                    ShowMessage("Could not find the device : " + _settings.Device + " . Check your configuration or activate your device.");
+                    Debug.WriteLine("Could not find the device : " + _settings.Device + " . Check your configuration or activate your device.");
                 return;
             }
             _usb2snes.Attach(_settings.Device);
@@ -287,7 +271,6 @@ namespace LiveSplit.UI.Components
 
         private bool ReadConfig()
         {
-
             try
             {
                 var jsonStr = File.ReadAllText(_settings.ConfigFile);
@@ -297,7 +280,7 @@ namespace LiveSplit.UI.Components
             }
             catch (Exception e)
             {
-                // ShowMessage("Could not open split config file, check config file settings. " + e.Message);
+                Debug.WriteLine("Could not open split config file, check config file settings. " + e.Message);
                 return false;
             }
             if (!this.CheckSplitsSetting())
@@ -324,63 +307,39 @@ namespace LiveSplit.UI.Components
                     }
                 }
             }
-            if (_game.Alias != null)
-            {
-                foreach (var a in _game.Alias)
-                {
-                    var d = _game.Definitions.Where(x => x.Name == a.Value).FirstOrDefault();
-                    if (d == null)
-                    {
-                        ShowMessage(String.Format("Alias definition <{0}> does not point to a split name in a category definition : {1}", a.Key, a.Value));
-                        r = false;
-                    }
-                }
-            }
+
             return r;
         }
 
         private bool CheckRunnableSetting()
         {
-            bool toret = true;
-            _splits = new List<string>(_game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First()?.Splits);
+            List<String> splits = new List<string>(_game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First()?.Splits);
 
-            if (_splits.Count == 0)
+            if (splits.Count == 0)
             {
                 ShowMessage("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
                 return false;
             }
-            if (_state.Run.Count() > _splits.Count())
+            if (_state.Run.Count() > splits.Count())
             {
                 ShowMessage(String.Format("There are more segments in your splits configuration <{0}> than the Autosplitter setting file <{1}>", _splits.Count(), _state.Run.Count()));
                 return false;
             }
-            foreach (var seg in _state.Run)
-            {
-                if (!_splits.Contains(seg.Name, StringComparer.OrdinalIgnoreCase))
-                {
-                    // Searching into Alias
-                    if (!_game.Alias.ContainsKey(seg.Name))
-                    {
-                        ShowMessage(String.Format("Your segment name <{0}> does not exist in the setting file. Neither as a split name or an alias.", seg.Name));
-                        toret = false;
-                    }
-                }
-            }
-            return toret;
+
+            return true;
         }
 
         // Let's build the split list based on the user segment list and not the category definition
         private void SetSplitList()
         {
-            _splits.Clear();
+            _splits?.Clear();
             var catSplits = _game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First().Splits;
-            foreach (var seg in _state.Run)
-            {
-                if (catSplits.Contains(seg.Name))
-                    _splits.Add(seg.Name);
-                else
-                    _splits.Add(_game.Alias[seg.Name]);
-            }
+
+            _splits = catSplits.Select(Name => _game.Definitions.Where(s => s.Name.ToLower() == Name.ToLower()).First()).ToList();
+        }
+        private void SetAutostart()
+        {
+            _autostart = _game.Definitions.Where(s => s.Name == _game.Autostart).FirstOrDefault();
         }
 
         private void _state_OnStart(object sender, EventArgs e)
@@ -438,40 +397,7 @@ namespace LiveSplit.UI.Components
 
         public async void DoSplit()
         {
-            if (_game.Name == "Super Metroid" && _usb2snes.Connected())
-            {
-                var data = await _usb2snes.GetAddress((uint)(0xF509DA), (uint)512);
-                int ms = (data[0] + (data[1] << 8)) * (1000 / 60);
-                int sec = data[2] + (data[3] << 8);
-                int min = data[4] + (data[5] << 8);
-                int hr = data[6] + (data[7] << 8);
-                var gt = new TimeSpan(0, hr, min, sec, ms);
-                _state.SetGameTime(gt);
-                _model.Split();
-            } else {
-                _model.Split();
-            }
-        }
-
-        private bool IsConfigReady()
-        {
-            if (_state.Layout.HasChanged)
-                _config_checked = false;
-            if (!_config_checked)
-            {
-                if (this.ReadConfig())
-                {
-                    if (_config_checked == false && CheckRunnableSetting())
-                    {
-                        _valid_config = true;
-                        SetSplitList();
-                    }
-                }
-                _config_checked = true;
-            }
-            if (!_valid_config)
-                return false;
-            return true;
+            _model.Split();
         }
 
         private bool IsConnectionReady()
@@ -507,7 +433,7 @@ namespace LiveSplit.UI.Components
                 await UpdateSplits();
             }  catch (Exception e)
             {
-                ShowMessage("Something bad happened: " + e.ToString());
+                Debug.WriteLine("Something bad happened: " + e.ToString());
                 Connect();
             } finally {
                 _inTimer = false;
@@ -516,15 +442,21 @@ namespace LiveSplit.UI.Components
 
         public async Task UpdateSplits()
         {
+            if (_proto_state != ProtocolState.ATTACHED)
+            {
+                Connect();
+                return;
+            }
+
             if (_state.CurrentPhase == TimerPhase.NotRunning)
             {
-                await CheckAutostartAsync();
+                await CheckAutostart();
             } else if (_state.CurrentPhase == TimerPhase.Running) {
                 await CheckSplits();
             }
         }
 
-        private async Task CheckAutostartAsync()
+        private async Task CheckAutostart()
         {
             if (!IsConfigReady())
             {
@@ -534,132 +466,61 @@ namespace LiveSplit.UI.Components
             {
                 _update_timer.Interval = 1000;
                 return;
-            }
-            else
+            } else
             {
                 _update_timer.Interval = 33;
             }
-            if (_game != null && _game.Autostart.Active == "1")
+            if (_game == null)
             {
-                if (_proto_state == ProtocolState.ATTACHED)
-                {
-                    byte[] data;
-                    try
-                    {
-                        data = await _usb2snes.GetAddress((0xF50000 + _game.Autostart.AddressInt), (uint)2);
-                    }
-                    catch
-                    {
-                        return;
-                    }
-                    if (data.Count() == 0)
-                    {
-                        Debug.WriteLine("Get address failed to return result");
-                        return;
-                    }
-                    uint value = (uint)data[0];
-                    uint word = (uint)(data[0] + (data[1] << 8));
+                return;
+            }
 
-                    switch (_game.Autostart.Type)
-                    {
-                        case "bit":
-                            if ((value & _game.Autostart.ValueInt) != 0) { _model.Start(); }
-                            break;
-                        case "eq":
-                            if (value == _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "gt":
-                            if (value > _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "lt":
-                            if (value < _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "gte":
-                            if (value >= _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "lte":
-                            if (value <= _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "wbit":
-                            if ((word & _game.Autostart.ValueInt) != 0) { _model.Start(); }
-                            break;
-                        case "weq":
-                            if (word == _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "wgt":
-                            if (word > _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "wlt":
-                            if (word < _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "wgte":
-                            if (word >= _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                        case "wlte":
-                            if (word <= _game.Autostart.ValueInt) { _model.Start(); }
-                            break;
-                    }
-                }
+            bool ok = await CheckSplit(_autostart);
+            if (ok)
+            {
+                _model.Start();
             }
         }
 
-        private async Task CheckSplits()
+        private bool IsConfigReady()
         {
-            if (_splits != null)
+            if (_state.Layout.HasChanged)
             {
-                if (_proto_state == ProtocolState.ATTACHED)
-                {
-                    var splitName = _splits[_state.CurrentSplitIndex];
-                    var split = _game.Definitions.Where(x => x.Name == splitName).First();
-                    var orignSplit = split;
-                    if (split.Next != null && split.PosToCheck != 0)
-                    {
-                        split = split.Next[split.PosToCheck - 1];
-                    }
-                    bool ok = await(DoCheckSplit(split));
-                    if (orignSplit.Next != null && ok)
-                    {
-                        Debug.WriteLine("Next count :" + orignSplit.Next.Count + " - Pos to check : " + orignSplit.PosToCheck);
-                        if (orignSplit.PosToCheck < orignSplit.Next.Count())
-                        {
-                            orignSplit.PosToCheck++;
-                            ok = false;
-                        }
-                        else
-                        {
-                            orignSplit.PosToCheck = 0;
-                        }
-                    }
-                    if (split.More != null)
-                    {
-                        foreach (var moreSplit in split.More)
-                        {
-                            if (!ok)
-                            {
-                                break;
-                            }
-                            ok = ok && await DoCheckSplit(moreSplit);
-                        }
-                    }
-
-                    if (ok)
-                    {
-                        DoSplit();
-                    }
-                }
-                else
-                {
-                    Connect();
-                }
+                _config_checked = false;
             }
+            if (!_config_checked)
+            {
+                if (this.ReadConfig())
+                {
+                    if (_config_checked == false && CheckRunnableSetting())
+                    {
+                        try
+                        {
+                            SetSplitList();
+                            SetAutostart();
+                            _valid_config = true;
+                        } catch(Exception e)
+                        {
+                            Debug.WriteLine("Splits could not be parsed: " + e.ToString());
+                            return false;
+                        }
+                    }
+                }
+                _config_checked = true;
+            }
+            if (!_valid_config)
+            { 
+                return false;
+            }
+            return true;
         }
 
-        async Task<bool> DoCheckSplit(Split split)
+        async Task<bool> CheckSplit(Split split)
         {
             byte[] data;
             try
             {
-                data = await _usb2snes.GetAddress((0xF50000 + split.AddressInt), (uint)2);
+                data = await _usb2snes.GetAddress(split.AddressInt.ToWramAddress(), DEFAULT_READ_SIZE);
             }
             catch
             {
@@ -670,11 +531,59 @@ namespace LiveSplit.UI.Components
                 Console.WriteLine("Get address failed to return result");
                 return false;
             }
-            uint value = (uint)data[0];
-            uint word = (uint)(data[0] + (data[1] << 8));
-            Debug.WriteLine("Address checked : " + split.Address + " - value : " + value);
-            return split.check(value, word);
+            return split.Check(data);
         }
+
+        private async Task CheckSplits()
+        {
+            if (_splits.Count() == 0)
+            {
+                Console.WriteLine("No splits available.");
+                return;
+            }
+            if (_splits.ElementAtOrDefault(_state.CurrentSplitIndex) == null)
+            {
+                return;
+            }
+
+            var split = _splits[_state.CurrentSplitIndex];
+            var orignSplit = split;
+            if (split.Next != null && split.PosToCheck != 0)
+            {
+                split = split.Next[split.PosToCheck - 1];
+            }
+            bool ok = await CheckSplit(split);
+            if (orignSplit.Next != null && ok)
+            {
+                Debug.WriteLine("Next count :" + orignSplit.Next.Count + " - Pos to check : " + orignSplit.PosToCheck);
+                if (orignSplit.PosToCheck < orignSplit.Next.Count())
+                {
+                    orignSplit.PosToCheck++;
+                    ok = false;
+                }
+                else
+                {
+                    orignSplit.PosToCheck = 0;
+                }
+            }
+            if (split.More != null)
+            {
+                foreach (var moreSplit in split.More)
+                {
+                    if (!ok)
+                    {
+                        break;
+                    }
+                    ok = ok && await CheckSplit(moreSplit);
+                }
+            }
+
+            if (ok)
+            {
+                DoSplit();
+            }
+        }
+
 
         public void DrawHorizontal(Graphics g, LiveSplitState state, float height, Region clipRegion)
         {
