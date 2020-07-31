@@ -102,7 +102,7 @@ namespace LiveSplit.UI.Components
 
                 bool result = operators[this.Type](value, this, delta);
 
-                // Console.WriteLine($"split[{this.Name}][{_state.CurrentSplitIndex}/{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
 
                 this.PreviousValueInt = value;
 
@@ -155,7 +155,6 @@ namespace LiveSplit.UI.Components
         private ProtocolState _proto_state;
         private bool _inTimer;
         private bool _valid_config;
-        private bool _config_checked;
         private USB2SnesW.USB2SnesW _usb2snes;
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
@@ -173,7 +172,6 @@ namespace LiveSplit.UI.Components
             _stateChanged = false;
             _splits = new List<Split>();
             _inTimer = false;
-            _config_checked = false;
             _valid_config = false;
 
             _update_timer = new Timer() { Interval = 1000 };
@@ -229,7 +227,7 @@ namespace LiveSplit.UI.Components
             if (!devices.Contains(_settings.Device))
             {
                 if (prevState == ProtocolState.NONE)
-                    Debug.WriteLine("Could not find the device : " + _settings.Device + " . Check your configuration or activate your device.");
+                    Debug.WriteLine($"Could not find the device '{_settings.Device}'. Check your configuration or activate your device.");
                 return;
             }
             _usb2snes.Attach(_settings.Device);
@@ -280,7 +278,7 @@ namespace LiveSplit.UI.Components
             }
             catch (Exception e)
             {
-                Debug.WriteLine("Could not open split config file, check config file settings. " + e.Message);
+                Debug.WriteLine($"Could not open split config file, check config file settings: {e.Message}");
                 return false;
             }
             if (!this.CheckSplitsSetting())
@@ -302,7 +300,7 @@ namespace LiveSplit.UI.Components
                     var d = _game.Definitions.Where(x => x.Name == s).FirstOrDefault();
                     if (d == null)
                     {
-                        ShowMessage(String.Format("Split definition missing: {0} for category {1}", s, c.Name));
+                        ShowMessage(String.Format($"Split definition missing: {s} for category {c.Name}"));
                         r = false;
                     }
                 }
@@ -317,13 +315,12 @@ namespace LiveSplit.UI.Components
 
             if (splits.Count == 0)
             {
-                ShowMessage("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
+                Debug.WriteLine("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
                 return false;
             }
             if (_state.Run.Count() > splits.Count())
             {
-                ShowMessage(String.Format("There are more segments in your splits configuration <{0}> than the Autosplitter setting file <{1}>", _splits.Count(), _state.Run.Count()));
-                return false;
+                Debug.WriteLine(String.Format($"There are more segments in your splits configuration <{_splits.Count()}> than the Autosplitter setting file <{_state.Run.Count()}>"));
             }
 
             return true;
@@ -424,7 +421,7 @@ namespace LiveSplit.UI.Components
             // "_inTimer" is a very questionable attempt at locking, but it's probably fine here.
             if (_inTimer)
             {
-                Debug.WriteLine("In timer already! !!!");
+                // Debug.WriteLine("In timer already! !!!");
                 return;
             }
             _inTimer = true;
@@ -433,7 +430,7 @@ namespace LiveSplit.UI.Components
                 await UpdateSplits();
             }  catch (Exception e)
             {
-                Debug.WriteLine("Something bad happened: " + e.ToString());
+                Debug.WriteLine($"Something bad happened: {e.ToString()}");
                 Connect();
             } finally {
                 _inTimer = false;
@@ -472,41 +469,30 @@ namespace LiveSplit.UI.Components
 
         private bool IsConfigReady()
         {
-            if (_state.Layout.HasChanged)
-            {
-                _config_checked = false;
-            }
-            if (!_config_checked)
-            {
-                if (this.ReadConfig())
+            if (!_valid_config && ReadConfig())
+            { 
+                if (CheckRunnableSetting())
                 {
-                    if (_config_checked == false && CheckRunnableSetting())
+                    try
                     {
-                        try
-                        {
-                            SetSplitList();
-                            SetAutostart();
-                            _valid_config = true;
+                        SetSplitList();
+                        SetAutostart();
+                        _valid_config = true;
 
-                            Debug.WriteLine($"{_splits.Count} splits detected:");
-                            foreach (var split in _splits)
-                            {
-                                Debug.WriteLine($"- {split.Name}");
-                            }
-                        } catch(Exception e)
+                        Debug.WriteLine($"{_splits.Count} splits detected:");
+                        foreach (var split in _splits)
                         {
-                            Debug.WriteLine("Splits could not be parsed: " + e.ToString());
-                            return false;
+                            Debug.WriteLine($"- {split.Name}");
                         }
+                    } catch (Exception e)
+                    {
+                        Debug.WriteLine($"Splits could not be parsed: {e.ToString()}");
+                        return false;
                     }
                 }
-                _config_checked = true;
             }
-            if (!_valid_config)
-            { 
-                return false;
-            }
-            return true;
+
+            return _valid_config;
         }
 
         private async Task CheckSplits()
@@ -532,7 +518,7 @@ namespace LiveSplit.UI.Components
             bool ok = await CheckSplit(split);
             if (orignSplit.Next != null && ok)
             {
-                Debug.WriteLine("Next count :" + orignSplit.Next.Count + " - Pos to check : " + orignSplit.PosToCheck);
+                Debug.WriteLine($"Next count :{orignSplit.Next.Count} - Pos to check: {orignSplit.PosToCheck}");
                 if (orignSplit.PosToCheck < orignSplit.Next.Count())
                 {
                     orignSplit.PosToCheck++;
@@ -595,7 +581,7 @@ namespace LiveSplit.UI.Components
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
             Color col;
-            Console.WriteLine(_mystate);
+            // Console.WriteLine(_mystate);
             switch (_mystate)
             {
                 case MyState.READY: col = _ok_color; break;
