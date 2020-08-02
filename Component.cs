@@ -60,6 +60,8 @@ namespace LiveSplit.UI.Components
             public string Address { get; set; }
             public string Value { get; set; }
             public string Type { get; set; }
+            public string Operator { get; set; }
+            public int Repeat { get; set; } = 0;
             public List<Split> More { get; set; }
             public List<Split> Next { get; set; }
             public int NextIndex { get; set; } = 0;
@@ -88,7 +90,7 @@ namespace LiveSplit.UI.Components
                     { "odelta", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
                 };
 
-                if (!types.TryGetValue(this.Type, out Func<byte[], uint> type))
+                if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
                 {
                     type = types["short"];
                 }
@@ -100,7 +102,7 @@ namespace LiveSplit.UI.Components
                     delta = (int)value - (int)this.PreviousValueInt;
                 }
 
-                bool result = operators[this.Type](value, this, delta);
+                bool result = operators[this.Operator](value, this, delta);
 
                 if (debug)
                 {
@@ -163,7 +165,7 @@ namespace LiveSplit.UI.Components
         private Split _autostart;
         private List<Split> _splits;
         private bool _inTimer;
-        private bool _valid_config;
+        private string _old_category;
 
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
@@ -188,7 +190,6 @@ namespace LiveSplit.UI.Components
             _update_timer.Enabled = true;
             _splits = new List<Split>();
             _inTimer = false;
-            _valid_config = false;
 
             HorizontalWidth = 3;
             VerticalHeight = 3;
@@ -320,10 +321,14 @@ namespace LiveSplit.UI.Components
         // Let's build the split list based on the user segment list and not the category definition
         private void SetSplitList()
         {
-            _splits?.Clear();
             var catSplits = _game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First().Splits;
+            var splits = catSplits.Select(Name => _game.Definitions.Where(s => s.Name.ToLower() == Name.ToLower()).First()).ToList();
 
-            _splits = catSplits.Select(Name => _game.Definitions.Where(s => s.Name.ToLower() == Name.ToLower()).First()).ToList();
+            _splits.Clear();
+            foreach (Split split in splits)
+            {
+                _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
+            }
         }
         private void SetAutostart()
         {
@@ -391,6 +396,8 @@ namespace LiveSplit.UI.Components
                 return true;
             }
 
+            Debug.WriteLine("Connection failed, trying again...");
+
             // this method actually does a BLOCKING request-response cycle (!!)
             if (!_usb2snes.Connected())
             {
@@ -450,6 +457,8 @@ namespace LiveSplit.UI.Components
                     SetAutostart();
                     _do_reload = false;
 
+                    CheckRunnableSetting();
+
                     Debug.WriteLine($"{_splits.Count} splits detected:");
                     foreach (var split in _splits)
                     {
@@ -462,7 +471,7 @@ namespace LiveSplit.UI.Components
                 }
             }
 
-            return !_do_reload && CheckRunnableSetting();
+            return !_do_reload;
         }
 
         private bool UpdateConfigFile()
@@ -549,6 +558,7 @@ namespace LiveSplit.UI.Components
                 }
             }
         }
+
         async Task<bool> CheckSplit(Split split)
         {
             byte[] data;
