@@ -55,14 +55,14 @@ namespace LiveSplit.UI.Components
 
         internal class Split
         {
+            public string Active { get; set; }
             public string Name { get; set; }
             public string Address { get; set; }
             public string Value { get; set; }
             public string Type { get; set; }
-            public string Active { get; set; }
             public List<Split> More { get; set; }
             public List<Split> Next { get; set; }
-            public int PosToCheck { get; set; } = 0;
+            public int NextIndex { get; set; } = 0;
 
             public uint AddressInt { get { return Address.ToFormattedUInt32(); } }
             public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
@@ -102,7 +102,7 @@ namespace LiveSplit.UI.Components
 
                 bool result = operators[this.Type](value, this, delta);
 
-                Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                // Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
 
                 this.PreviousValueInt = value;
 
@@ -144,45 +144,51 @@ namespace LiveSplit.UI.Components
 
         public IDictionary<string, Action> ContextMenuControls => null;
 
-        private Timer _update_timer;
-        private ComponentSettings _settings;
+        private USB2SnesW.USB2SnesW _usb2snes;
+        private MyState _mystate;
+        private ProtocolState _proto_state;
+        private bool _stateChanged;
+
         private LiveSplitState _state;
+        private ComponentSettings _settings;
         private TimerModel _model;
+        private Timer _update_timer;
+        private bool _do_reload = true;
+        private string _old_script_path;
+
         private Game _game;
         private Split _autostart;
         private List<Split> _splits;
-        private MyState _mystate;
-        private ProtocolState _proto_state;
         private bool _inTimer;
         private bool _valid_config;
-        private USB2SnesW.USB2SnesW _usb2snes;
+
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
         private Color _connecting_color = Color.FromArgb(128, 128, 0);
-        bool _stateChanged;
 
         private void Init(LiveSplitState state, USB2SnesW.USB2SnesW usb2snesw)
         {
-            _state = state;
+            _usb2snes = usb2snesw;
             _mystate = MyState.NONE;
             _proto_state = ProtocolState.NONE;
+            _stateChanged = false;
+
+            _state = state;
             _settings = new ComponentSettings();
             _model = new TimerModel() { CurrentState = _state };
             _state.RegisterTimerModel(_model);
-            _stateChanged = false;
-            _splits = new List<Split>();
-            _inTimer = false;
-            _valid_config = false;
+            _state.OnReset += _state_OnReset;
+            _state.OnStart += _state_OnStart;
 
             _update_timer = new Timer() { Interval = 1000 };
             _update_timer.Tick += (sender, args) => UpdateSplitsWrapper();
             _update_timer.Enabled = true;
+            _splits = new List<Split>();
+            _inTimer = false;
+            _valid_config = false;
 
-            _state.OnReset += _state_OnReset;
-            _state.OnStart += _state_OnStart;
             HorizontalWidth = 3;
             VerticalHeight = 3;
-            _usb2snes = usb2snesw;
         }
 
         public USB2SNESComponent(LiveSplitState state)
@@ -206,7 +212,7 @@ namespace LiveSplit.UI.Components
             {
                 return;
             }
-            Debug.WriteLine("Setting state to " + state);
+            Debug.WriteLine($"USB2SNES state = {state}");
             _stateChanged = true;
             _mystate = state;
         }
@@ -267,29 +273,6 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        private bool ReadConfig()
-        {
-            try
-            {
-                var jsonStr = File.ReadAllText(_settings.ConfigFile);
-                _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(
-                    jsonStr
-                );
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine($"Could not open split config file, check config file settings: {e.Message}");
-                return false;
-            }
-            if (!this.CheckSplitsSetting())
-            {
-                ShowMessage("The split config file has missing definitions.");
-                return false;
-            }
-
-            return true;
-        }
-
         private bool CheckSplitsSetting()
         {
             bool r = true;
@@ -311,6 +294,11 @@ namespace LiveSplit.UI.Components
 
         private bool CheckRunnableSetting()
         {
+            if(_game == null)
+            {
+                return false;
+            }
+
             List<String> splits = new List<string>(_game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First()?.Splits);
 
             if (splits.Count == 0)
@@ -318,9 +306,9 @@ namespace LiveSplit.UI.Components
                 Debug.WriteLine("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
                 return false;
             }
-            if (_state.Run.Count() > splits.Count())
+            if (_state.Run.Count() != splits.Count())
             {
-                Debug.WriteLine(String.Format($"There are more segments in your splits configuration <{_splits.Count()}> than the Autosplitter setting file <{_state.Run.Count()}>"));
+                Debug.WriteLine(String.Format($"The segment count <{_splits.Count()}> does not match the Autosplitter setting file <{_state.Run.Count()}>"));
             }
 
             return true;
@@ -392,25 +380,22 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        public async void DoSplit()
-        {
-            _model.Split();
-        }
-
         private bool IsConnectionReady()
         {
             // Debug.WriteLine("Checking connection");
             if (_proto_state == ProtocolState.ATTACHED)
+            {
                 return true;
+            }
 
             // this method actually does a BLOCKING request-response cycle (!!)
-            bool connected = _usb2snes.Connected();
-            if (!connected)
+            if (!_usb2snes.Connected())
             {
                 SetState(MyState.NONE);
                 _proto_state = ProtocolState.NONE;
             }
-            this.Connect();
+
+            Connect();
             return false;
         }
 
@@ -430,7 +415,7 @@ namespace LiveSplit.UI.Components
                 await UpdateSplits();
             }  catch (Exception e)
             {
-                Debug.WriteLine($"Something bad happened: {e.ToString()}");
+                Debug.WriteLine($"Something bad happened: {e}");
                 Connect();
             } finally {
                 _inTimer = false;
@@ -439,17 +424,7 @@ namespace LiveSplit.UI.Components
 
         public async Task UpdateSplits()
         {
-            if (_proto_state != ProtocolState.ATTACHED)
-            {
-                Connect();
-                return;
-            }
-
-            if (!IsConfigReady())
-            {
-                return;
-            }
-            if (!IsConnectionReady())
+            if (!IsConnectionReady() || !IsConfigReady())
             {
                 _update_timer.Interval = 1000;
                 return;
@@ -458,41 +433,61 @@ namespace LiveSplit.UI.Components
             {
                 _update_timer.Interval = 33;
             }
-
-            if (_game == null)
-            {
-                return;
-            }
-
+                        
             await CheckSplits();
         }
 
         private bool IsConfigReady()
         {
-            if (!_valid_config && ReadConfig())
+            if (UpdateConfigFile())
             { 
-                if (CheckRunnableSetting())
+                try
                 {
-                    try
-                    {
-                        SetSplitList();
-                        SetAutostart();
-                        _valid_config = true;
+                    SetSplitList();
+                    SetAutostart();
+                    _do_reload = false;
 
-                        Debug.WriteLine($"{_splits.Count} splits detected:");
-                        foreach (var split in _splits)
-                        {
-                            Debug.WriteLine($"- {split.Name}");
-                        }
-                    } catch (Exception e)
+                    Debug.WriteLine($"{_splits.Count} splits detected:");
+                    foreach (var split in _splits)
                     {
-                        Debug.WriteLine($"Splits could not be parsed: {e.ToString()}");
-                        return false;
+                        Debug.WriteLine($"- {split.Name}");
                     }
+                } catch (Exception e)
+                {
+                    Debug.WriteLine($"Splits could not be parsed: {e}");
+                    return false;
                 }
             }
 
-            return _valid_config;
+            return !_do_reload && CheckRunnableSetting();
+        }
+
+        private bool UpdateConfigFile()
+        {
+            if (_old_script_path == null || _settings.ConfigFile != _old_script_path)
+            {
+                _old_script_path = _settings.ConfigFile;
+                _do_reload = true;
+            }
+
+            try
+            {
+                var jsonString = File.ReadAllText(_settings.ConfigFile);
+                _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Could not open split config file, check config file settings: {e.Message}");
+                return false;
+            }
+
+            if (!CheckSplitsSetting())
+            {
+                ShowMessage("The split config file has missing definitions.");
+                return false;
+            }
+
+            return _do_reload;
         }
 
         private async Task CheckSplits()
@@ -511,22 +506,22 @@ namespace LiveSplit.UI.Components
             }
 
             var orignSplit = split;
-            if (split.Next != null && split.PosToCheck != 0)
+            if (split.Next != null && split.NextIndex != 0)
             {
-                split = split.Next[split.PosToCheck - 1];
+                split = split.Next[split.NextIndex - 1];
             }
             bool ok = await CheckSplit(split);
             if (orignSplit.Next != null && ok)
             {
-                Debug.WriteLine($"Next count :{orignSplit.Next.Count} - Pos to check: {orignSplit.PosToCheck}");
-                if (orignSplit.PosToCheck < orignSplit.Next.Count())
+                Debug.WriteLine($"Next count :{orignSplit.Next.Count} - Pos to check: {orignSplit.NextIndex}");
+                if (orignSplit.NextIndex < orignSplit.Next.Count())
                 {
-                    orignSplit.PosToCheck++;
+                    orignSplit.NextIndex++;
                     ok = false;
                 }
                 else
                 {
-                    orignSplit.PosToCheck = 0;
+                    orignSplit.NextIndex = 0;
                 }
             }
             if (split.More != null)
@@ -547,7 +542,7 @@ namespace LiveSplit.UI.Components
                 {
                     _model.Start();
                 } else {
-                    DoSplit();
+                    _model.Split();
                 }
             }
         }
@@ -581,7 +576,6 @@ namespace LiveSplit.UI.Components
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
             Color col;
-            // Console.WriteLine(_mystate);
             switch (_mystate)
             {
                 case MyState.READY: col = _ok_color; break;
