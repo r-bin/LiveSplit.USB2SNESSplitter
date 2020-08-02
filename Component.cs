@@ -69,7 +69,7 @@ namespace LiveSplit.UI.Components
 
             public uint? PreviousValueInt { get; set; }
 
-            public bool Check(byte[] data)
+            public bool Check(byte[] data, bool debug)
             {
                 var types = new Dictionary<string, Func<byte[], uint>>()
                 {
@@ -102,7 +102,10 @@ namespace LiveSplit.UI.Components
 
                 bool result = operators[this.Type](value, this, delta);
 
-                // Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                if (debug)
+                {
+                    Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                }
 
                 this.PreviousValueInt = value;
 
@@ -493,7 +496,7 @@ namespace LiveSplit.UI.Components
         private async Task CheckSplits()
         {
             Split split;
-            if (_state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
+            if (_settings.Autostart && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
             {
                 split = _autostart;
             }
@@ -562,28 +565,28 @@ namespace LiveSplit.UI.Components
                 Console.WriteLine("Get address failed to return result");
                 return false;
             }
-            return split.Check(data);
+            return split.Check(data, _settings.Debug);
         }
 
-        public void DrawHorizontal(Graphics g, LiveSplitState state, float height, Region clipRegion)
+        public void DrawHorizontal(Graphics graphics, LiveSplitState state, float height, Region clipRegion)
         {
             VerticalHeight = height;
             HorizontalWidth = 3;
         }
 
-        public void DrawVertical(Graphics g, LiveSplitState state, float width, Region clipRegion)
+        public void DrawVertical(Graphics graphics, LiveSplitState state, float width, Region clipRegion)
         {
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
-            Color col;
+            Color color;
             switch (_mystate)
             {
-                case MyState.READY: col = _ok_color; break;
-                case MyState.CONNECTING: col = _connecting_color; break;
-                default: col = _error_color; break;
+                case MyState.READY: color = _ok_color; break;
+                case MyState.CONNECTING: color = _connecting_color; break;
+                default: color = _error_color; break;
             }
-            Brush b = new SolidBrush(col);
-            g.FillRectangle(b, 0, 0, width, 3);
+            Brush brush = new SolidBrush(color);
+            graphics.FillRectangle(brush, 0, 0, width, 3);
         }
     }
 }
