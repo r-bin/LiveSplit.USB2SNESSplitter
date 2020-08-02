@@ -35,6 +35,8 @@
             this.btnBrowse = new System.Windows.Forms.Button();
             this.btnDetect = new System.Windows.Forms.Button();
             this.chkReset = new System.Windows.Forms.CheckBox();
+            this.chkDebug = new System.Windows.Forms.CheckBox();
+            this.chkAutostart = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // label1
@@ -45,7 +47,6 @@
             this.label1.Size = new System.Drawing.Size(44, 13);
             this.label1.TabIndex = 0;
             this.label1.Text = "Device:";
-            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // txtComPort
             // 
@@ -93,17 +94,39 @@
             // chkReset
             // 
             this.chkReset.AutoSize = true;
-            this.chkReset.Location = new System.Drawing.Point(72, 69);
+            this.chkReset.Location = new System.Drawing.Point(72, 92);
             this.chkReset.Name = "chkReset";
             this.chkReset.Size = new System.Drawing.Size(156, 17);
             this.chkReset.TabIndex = 6;
             this.chkReset.Text = "Reset SNES on Timer reset";
             this.chkReset.UseVisualStyleBackColor = true;
             // 
+            // chkDebug
+            // 
+            this.chkDebug.AutoSize = true;
+            this.chkDebug.Location = new System.Drawing.Point(72, 115);
+            this.chkDebug.Name = "chkDebug";
+            this.chkDebug.Size = new System.Drawing.Size(135, 17);
+            this.chkDebug.TabIndex = 7;
+            this.chkDebug.Text = "Verbose debug logging";
+            this.chkDebug.UseVisualStyleBackColor = true;
+            // 
+            // chkAutostart
+            // 
+            this.chkAutostart.AutoSize = true;
+            this.chkAutostart.Location = new System.Drawing.Point(72, 69);
+            this.chkAutostart.Name = "chkAutostart";
+            this.chkAutostart.Size = new System.Drawing.Size(91, 17);
+            this.chkAutostart.TabIndex = 8;
+            this.chkAutostart.Text = "Autostart Split";
+            this.chkAutostart.UseVisualStyleBackColor = true;
+            // 
             // ComponentSettings
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.Controls.Add(this.chkAutostart);
+            this.Controls.Add(this.chkDebug);
             this.Controls.Add(this.chkReset);
             this.Controls.Add(this.btnDetect);
             this.Controls.Add(this.btnBrowse);
@@ -128,5 +151,7 @@
         private System.Windows.Forms.Button btnBrowse;
         private System.Windows.Forms.Button btnDetect;
         private System.Windows.Forms.CheckBox chkReset;
+        private System.Windows.Forms.CheckBox chkDebug;
+        private System.Windows.Forms.CheckBox chkAutostart;
     }
 }

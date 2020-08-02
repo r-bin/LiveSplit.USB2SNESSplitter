@@ -12,7 +12,9 @@ namespace LiveSplit.UI.Components
 
         public string Device { get; set; }
         public string ConfigFile { get; set; }
+        public bool Autostart { get; set; }
         public bool ResetSNES { get; set; }
+        public bool Debug { get; set; }
 
         public ComponentSettings()
         {
@@ -22,14 +24,18 @@ namespace LiveSplit.UI.Components
 
             txtComPort.DataBindings.Add("Text", this, "Device", false, DataSourceUpdateMode.OnPropertyChanged);
             txtConfigFile.DataBindings.Add("Text", this, "ConfigFile", false, DataSourceUpdateMode.OnPropertyChanged);
+            chkAutostart.DataBindings.Add("Checked", this, "Autostart", false, DataSourceUpdateMode.OnPropertyChanged);
             chkReset.DataBindings.Add("Checked", this, "ResetSNES", false, DataSourceUpdateMode.OnPropertyChanged);
+            chkDebug.DataBindings.Add("Checked", this, "Debug", false, DataSourceUpdateMode.OnPropertyChanged);
         }
         public void SetSettings(XmlNode node)
         {
             var element = (XmlElement)node;
             Device = SettingsHelper.ParseString(element["Device"]);
             ConfigFile = SettingsHelper.ParseString(element["ConfigFile"]);
-            ResetSNES = SettingsHelper.ParseBool(element["ResetSNES"]);    
+            Autostart = SettingsHelper.ParseBool(element["Autostart"]);    
+            ResetSNES = SettingsHelper.ParseBool(element["ResetSNES"]);
+            Debug = SettingsHelper.ParseBool(element["Debug"]);    
         }
 
         public XmlNode GetSettings(XmlDocument document)
@@ -49,7 +55,9 @@ namespace LiveSplit.UI.Components
             return SettingsHelper.CreateSetting(document, parent, "Version", "1.2") ^
             SettingsHelper.CreateSetting(document, parent, "Device", Device) ^
             SettingsHelper.CreateSetting(document, parent, "ConfigFile", ConfigFile) ^
-            SettingsHelper.CreateSetting(document, parent, "ResetSNES", ResetSNES);
+            SettingsHelper.CreateSetting(document, parent, "Autostart", Autostart) ^
+            SettingsHelper.CreateSetting(document, parent, "ResetSNES", ResetSNES) ^
+            SettingsHelper.CreateSetting(document, parent, "Debug", Debug);
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -77,11 +85,5 @@ namespace LiveSplit.UI.Components
             }
             MessageBox.Show("Could not auto-detect usb2snes compatible device, make sure it's connected and QUsb2Snes is running");
         }
-
-        private void label1_Click(object sender, EventArgs e)
-        {
-
-        }
     }
-
 }
