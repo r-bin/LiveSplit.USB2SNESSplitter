@@ -55,6 +55,8 @@ namespace LiveSplit.UI.Components
 
         internal class Split
         {
+            public Split Parent { get; set; }
+
             public string Active { get; set; }
             public string Name { get; set; }
             public string Address { get; set; }
@@ -106,12 +108,26 @@ namespace LiveSplit.UI.Components
 
                 if (debug)
                 {
-                    Debug.WriteLine($"split[{this.Name}][{this.Next?.Count()}] {this.Address } = {value}/{this.ValueInt} == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                    var nextString = "-";
+                    if (this.Next?.Count() > 0)
+                    {
+                        nextString = $"{this.NextIndex + 1}/{this.Next?.Count() + 1}";
+                    }
+                    else if (this.Parent != null)
+                    {
+                        nextString = $"{this.Parent.NextIndex + 1}/{this.Parent.Next?.Count() + 1}";
+                    }
+                    Debug.WriteLine($"split[{(this.Parent != null ? this.Parent.Name : this.Name)}][{nextString}] {this.Address } = ({value}{this.Operator}{this.ValueInt}) == {result} (delta={delta}, prev={this.PreviousValueInt})");
                 }
 
                 this.PreviousValueInt = value;
 
                 return result;
+            }
+
+            internal void Reset()
+            {
+                this.NextIndex = 0;
             }
         }
 
@@ -337,8 +353,10 @@ namespace LiveSplit.UI.Components
 
         private void _state_OnStart(object sender, EventArgs e)
         {
-            Console.WriteLine("On START?");
-            return;
+            foreach (Split split in _splits)
+            {
+                split.Reset();
+            }
         }
 
         private void _state_OnReset(object sender, TimerPhase value)
@@ -521,6 +539,7 @@ namespace LiveSplit.UI.Components
             if (split.Next != null && split.NextIndex != 0)
             {
                 split = split.Next[split.NextIndex - 1];
+                split.Parent = orignSplit;
             }
             bool ok = await CheckSplit(split);
             if (orignSplit.Next != null && ok)
