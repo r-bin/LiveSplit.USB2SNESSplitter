@@ -117,7 +117,7 @@ namespace LiveSplit.UI.Components
                     {
                         nextString = $"{this.Parent.NextIndex + 1}/{this.Parent.Next?.Count() + 1}";
                     }
-                    Debug.WriteLine($"split[{(this.Parent != null ? this.Parent.Name : this.Name)}][{nextString}] {this.Address } = ({value}{this.Operator}{this.ValueInt}) == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                    Log.Info($"split[{(this.Parent != null ? this.Parent.Name : this.Name)}][{nextString}] {this.Address } = ({value}{this.Operator}{this.ValueInt}) == {result} (delta={delta}, prev={this.PreviousValueInt})");
                 }
 
                 this.PreviousValueInt = value;
@@ -232,7 +232,7 @@ namespace LiveSplit.UI.Components
             {
                 return;
             }
-            Debug.WriteLine($"USB2SNES state = {state}");
+            Log.Info($"USB2SNES state = {state}");
             _stateChanged = true;
             _mystate = state;
         }
@@ -253,7 +253,7 @@ namespace LiveSplit.UI.Components
             if (!devices.Contains(_settings.Device))
             {
                 if (prevState == ProtocolState.NONE)
-                    Debug.WriteLine($"Could not find the device '{_settings.Device}'. Check your configuration or activate your device.");
+                    Log.Info($"Could not find the device '{_settings.Device}'. Check your configuration or activate your device.");
                 return;
             }
             _usb2snes.Attach(_settings.Device);
@@ -323,12 +323,12 @@ namespace LiveSplit.UI.Components
 
             if (splits.Count == 0)
             {
-                Debug.WriteLine("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
+                Log.Error("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
                 return false;
             }
             if (_state.Run.Count() != splits.Count())
             {
-                Debug.WriteLine(String.Format($"The segment count <{_splits.Count()}> does not match the Autosplitter setting file <{_state.Run.Count()}>"));
+                Log.Error(String.Format($"The segment count <{_splits.Count()}> does not match the Autosplitter setting file <{_state.Run.Count()}>"));
             }
 
             return true;
@@ -361,6 +361,11 @@ namespace LiveSplit.UI.Components
 
         private void _state_OnReset(object sender, TimerPhase value)
         {
+            foreach (Split split in _splits)
+            {
+                split.Reset();
+            }
+
             if (_usb2snes.Connected())
             {
                 if (_settings.ResetSNES)
@@ -408,13 +413,12 @@ namespace LiveSplit.UI.Components
 
         private bool IsConnectionReady()
         {
-            // Debug.WriteLine("Checking connection");
             if (_proto_state == ProtocolState.ATTACHED)
             {
                 return true;
             }
 
-            Debug.WriteLine("Connection failed, trying again...");
+            Log.Info("Connection failed, trying again...");
 
             // this method actually does a BLOCKING request-response cycle (!!)
             if (!_usb2snes.Connected())
@@ -429,12 +433,9 @@ namespace LiveSplit.UI.Components
 
         private async void UpdateSplitsWrapper()
         {
-
-            // Debug.WriteLine("Timer tick " + DateTime.Now);
             // "_inTimer" is a very questionable attempt at locking, but it's probably fine here.
             if (_inTimer)
             {
-                // Debug.WriteLine("In timer already! !!!");
                 return;
             }
             _inTimer = true;
@@ -443,7 +444,7 @@ namespace LiveSplit.UI.Components
                 await UpdateSplits();
             }  catch (Exception e)
             {
-                Debug.WriteLine($"Something bad happened: {e}");
+                Log.Error($"Something bad happened: {e}");
                 Connect();
             } finally {
                 _inTimer = false;
@@ -477,14 +478,14 @@ namespace LiveSplit.UI.Components
 
                     CheckRunnableSetting();
 
-                    Debug.WriteLine($"{_splits.Count} splits detected:");
+                    Log.Info($"{_splits.Count} splits detected:");
                     foreach (var split in _splits)
                     {
-                        Debug.WriteLine($"- {split.Name}");
+                        Log.Info($"- {split.Name}");
                     }
                 } catch (Exception e)
                 {
-                    Debug.WriteLine($"Splits could not be parsed: {e}");
+                    Log.Error($"Splits could not be parsed: {e}");
                     return false;
                 }
             }
@@ -507,13 +508,13 @@ namespace LiveSplit.UI.Components
             }
             catch (Exception e)
             {
-                Debug.WriteLine($"Could not open split config file, check config file settings: {e.Message}");
+                Log.Error($"Could not open split config file, check config file settings: {e.Message}");
                 return false;
             }
 
             if (!CheckSplitsSetting())
             {
-                ShowMessage("The split config file has missing definitions.");
+                Log.Error("The split config file has missing definitions.");
                 return false;
             }
 
@@ -544,7 +545,6 @@ namespace LiveSplit.UI.Components
             bool ok = await CheckSplit(split);
             if (orignSplit.Next != null && ok)
             {
-                Debug.WriteLine($"Next count :{orignSplit.Next.Count} - Pos to check: {orignSplit.NextIndex}");
                 if (orignSplit.NextIndex < orignSplit.Next.Count())
                 {
                     orignSplit.NextIndex++;
@@ -569,7 +569,9 @@ namespace LiveSplit.UI.Components
 
             if (ok)
             {
-                if(orignSplit == _autostart)
+                Log.Info($"split[{(orignSplit.Name)}] {orignSplit.Address}{orignSplit.Operator}{orignSplit.ValueInt}");
+
+                if (orignSplit == _autostart)
                 {
                     _model.Start();
                 } else {
