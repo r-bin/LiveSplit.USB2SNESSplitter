@@ -29,14 +29,18 @@ LiveSplit (Your LiveSplit directory)
   * If the connection bar does not turn green, SD2SNES was not connected properly with USB2SNES (See [Error Handling](#error-handling))
   * [Qusb2Snes](https://skarsnik.github.io/QUsb2snes/) also works (And is compatible with emulators)
 * Choose a JSON config file
+  * Examples can be found in [snes-scripts](https://github.com/r-bin/snes-scripts/) (See [JSON files](#json-files))
   * ASL files are not compatible (Only with [Scritable Auto Splitter](https://github.com/LiveSplit/LiveSplit#auto-splitters))
   * The JSON file also contains the list of active splits at the top
   * If the splitter does not work, check the content of the JSON file (See [Error Handling](#error-handling))
 
+## JSON files
+
+Example files be found [here](https://github.com/r-bin/snes-scripts/tree/master/LiveSplit%20Auto%20Splitters/USB2SNES).
+
 ## Error Handling
 
 Errors aren't displayed in LiveSplit. In order to find detailed error messages [DebugView](https://docs.microsoft.com/en-us/sysinternals/downloads/debugview) can be used.
-
 
 ## Developing JSON Files
 
