@@ -12,6 +12,7 @@ using System.Linq.Expressions;
 using USB2SnesW;
 using System.Drawing;
 using System.Collections;
+using LiveSplit.ASL;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("LiveSplit.USB2SNESSplitterTests")]
 
@@ -36,8 +37,15 @@ namespace LiveSplit.UI.Components
 
     public class USB2SNESComponent : IComponent
     {
+        #region Init
+
         public const uint SD2SNES_WRAM_BASE_ADDRESS = 0xF50000;
         public const uint DEFAULT_READ_SIZE = 64;
+
+        public const bool SETTINGS_AUTOSTART = true;
+        public const bool SETTINGS_RESET = false;
+        public const bool SETTINGS_DEBUG = true;
+        public const bool SETTINGS_HIDE_UI_BAR = false;
 
         enum MyState
         {
@@ -222,6 +230,10 @@ namespace LiveSplit.UI.Components
 
         }
 
+        #endregion
+
+        #region Helpers
+
         private void ShowMessage(String msg)
         {
             MessageBox.Show(msg, "USB2Snes AutoSplitter");
@@ -334,9 +346,10 @@ namespace LiveSplit.UI.Components
             return true;
         }
 
-        // Let's build the split list based on the user segment list and not the category definition
         private void SetSplitList()
         {
+            var aslSettings = new ASLSettings();
+
             var catSplits = _game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First().Splits;
             var splits = catSplits.Select(Name => _game.Definitions.Where(s => s.Name.ToLower() == Name.ToLower()).First()).ToList();
 
@@ -344,7 +357,10 @@ namespace LiveSplit.UI.Components
             foreach (Split split in splits)
             {
                 _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
+                aslSettings.AddSetting(split.Name, true, split.Name, null);
             }
+
+            _settings.SetASLSettings(aslSettings);
         }
         private void SetAutostart()
         {
@@ -368,7 +384,7 @@ namespace LiveSplit.UI.Components
 
             if (_usb2snes.Connected())
             {
-                if (_settings.ResetSNES)
+                if (SETTINGS_RESET)
                 {
                     _usb2snes.Reset();
                 }
@@ -400,6 +416,10 @@ namespace LiveSplit.UI.Components
         {
             _settings.SetSettings(settings);
         }
+
+        #endregion
+
+        #region Update Timer
 
         public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height,
             LayoutMode mode)
@@ -495,15 +515,15 @@ namespace LiveSplit.UI.Components
 
         private bool UpdateConfigFile()
         {
-            if (_old_script_path == null || _settings.ConfigFile != _old_script_path)
+            if (_old_script_path == null || _settings.ScriptPath != _old_script_path)
             {
-                _old_script_path = _settings.ConfigFile;
+                _old_script_path = _settings.ScriptPath;
                 _do_reload = true;
             }
 
             try
             {
-                var jsonString = File.ReadAllText(_settings.ConfigFile);
+                var jsonString = File.ReadAllText(_settings.ScriptPath);
                 _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
             }
             catch (Exception e)
@@ -524,7 +544,7 @@ namespace LiveSplit.UI.Components
         private async Task CheckSplits()
         {
             Split split;
-            if (_settings.Autostart && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
+            if (SETTINGS_AUTOSTART && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
             {
                 split = _autostart;
             }
@@ -596,8 +616,12 @@ namespace LiveSplit.UI.Components
                 Console.WriteLine("Get address failed to return result");
                 return false;
             }
-            return split.Check(data, _settings.Debug);
+            return split.Check(data, SETTINGS_DEBUG);
         }
+
+        #endregion
+
+        #region UI Drawing
 
         public void DrawHorizontal(Graphics graphics, LiveSplitState state, float height, Region clipRegion)
         {
@@ -607,6 +631,11 @@ namespace LiveSplit.UI.Components
 
         public void DrawVertical(Graphics graphics, LiveSplitState state, float width, Region clipRegion)
         {
+            if(SETTINGS_HIDE_UI_BAR)
+            {
+                return;
+            }
+
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
             Color color;
@@ -619,5 +648,7 @@ namespace LiveSplit.UI.Components
             Brush brush = new SolidBrush(color);
             graphics.FillRectangle(brush, 0, 0, width, 3);
         }
+
+        #endregion
     }
 }

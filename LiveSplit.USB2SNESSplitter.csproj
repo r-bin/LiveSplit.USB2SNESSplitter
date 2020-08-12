@@ -72,12 +72,6 @@
     <Compile Include="ASL\ASLScript.cs" />
     <Compile Include="ASL\ASLSettings.cs" />
     <Compile Include="ASL\ASLState.cs" />
-    <Compile Include="ComponentSettings_asl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="ComponentSettings_asl.Designer.cs">
-      <DependentUpon>ComponentSettings_asl.cs</DependentUpon>
-    </Compile>
     <Compile Include="ComponentSettings.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -93,9 +87,6 @@
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="ComponentSettings_asl.resx">
-      <DependentUpon>ComponentSettings_asl.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="ComponentSettings.resx">
       <DependentUpon>ComponentSettings.cs</DependentUpon>
     </EmbeddedResource>
