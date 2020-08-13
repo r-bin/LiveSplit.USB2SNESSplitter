@@ -67,6 +67,8 @@ namespace LiveSplit.UI.Components
 
             public bool Active { get; set; }
             public string Name { get; set; }
+            public string Description { get; set; }
+            public string Tooltip { get; set; }
             public string Address { get; set; }
             public string Value { get; set; }
             public string Type { get; set; }
@@ -482,7 +484,7 @@ namespace LiveSplit.UI.Components
             _splits.Clear();
             foreach (Split split in _game.Splits)
             {
-                aslSettings.AddSetting(split.Name, split.Active || split.IsCategory(), split.Name, null);
+                aslSettings.AddSetting(split.Name, split.Active || split.IsCategory(), split.Description, null);
                 if (!split.IsCategory())
                 {
                     _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
@@ -492,7 +494,7 @@ namespace LiveSplit.UI.Components
                     foreach (Split s in split.Children)
                     {
                         _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
-                        aslSettings.AddSetting(s.Name, s.Active, s.Name, split.Name);
+                        aslSettings.AddSetting(s.Name, s.Active, s.Description, split.Name);
                     }
                 }
             }
