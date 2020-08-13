@@ -63,6 +63,7 @@ namespace LiveSplit.UI.Components
         internal class Split
         {
             public Split Parent { get; set; }
+            public List<Split> Children { get; set; }
 
             public string Active { get; set; }
             public string Name { get; set; }
@@ -79,6 +80,11 @@ namespace LiveSplit.UI.Components
             public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
 
             public uint? PreviousValueInt { get; set; }
+
+            public bool IsCategory()
+            {
+                return Children?.Count > 0;
+            }
 
             public bool Check(byte[] data, bool debug)
             {
@@ -339,8 +345,18 @@ namespace LiveSplit.UI.Components
             _splits.Clear();
             foreach (Split split in _game.Splits)
             {
-                _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
                 aslSettings.AddSetting(split.Name, true, split.Name, null);
+                if (!split.IsCategory())
+                {
+                    _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
+                } else
+                {
+                    foreach (Split s in split.Children)
+                    {
+                        _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
+                        aslSettings.AddSetting(s.Name, true, s.Name, split.Name);
+                    }
+                }
             }
 
             _aslSettings = aslSettings;
@@ -524,8 +540,11 @@ namespace LiveSplit.UI.Components
             }
             else if (_aslSettings.GetBasicSettingValue("split") && _state.CurrentPhase == TimerPhase.Running)
             {
-                var splits = _aslSettings.OrderedSettings.Where(s => s.Value).ToArray();
-                split = _splits.Where(s => s.Name.ToLower() == splits[_state.CurrentSplitIndex].Id.ToLower()).First();
+                var splits = _splits.Where(s => _aslSettings.OrderedSettings.Where(s2 => s.Name == s2.Id).Any(s2 => s2.Value && (s2.Parent == null || (_aslSettings.OrderedSettings.Where(s3 => s3.Id == s2.Parent).First()?.Value ?? false))));
+                if (splits.Count() > _state.CurrentSplitIndex)
+                {
+                    split = splits.ToArray()[_state.CurrentSplitIndex];
+                }
             }
 
             if (split == null)
