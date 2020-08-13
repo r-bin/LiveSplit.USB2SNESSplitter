@@ -65,7 +65,7 @@ namespace LiveSplit.UI.Components
             public Split Parent { get; set; }
             public List<Split> Children { get; set; }
 
-            public string Active { get; set; }
+            public bool Active { get; set; }
             public string Name { get; set; }
             public string Address { get; set; }
             public string Value { get; set; }
@@ -194,7 +194,6 @@ namespace LiveSplit.UI.Components
         private Split _autostart;
         private List<Split> _splits;
         private bool _inTimer;
-        private string _old_category;
 
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
@@ -308,59 +307,6 @@ namespace LiveSplit.UI.Components
                 if (connected)
                     WsAttach(prevState);
             }
-        }
-
-        private bool CheckRunnableSetting()
-        {
-            if(_game == null)
-            {
-                return false;
-            }
-
-            if (_game.Splits.Count == 0)
-            {
-                Log.Error("The config file contains no splits.");
-                return false;
-            }
-
-            return true;
-        }
-
-        private void SetAutostart()
-        {
-            _autostart = _game.Autostart;
-        }
-        private void SetSplitList()
-        {
-            var aslSettings = new ASLSettings();
-            if (_autostart != null)
-            {
-                aslSettings.AddBasicSetting("start");
-            }
-            if (_game.Splits.Count > 0)
-            {
-                aslSettings.AddBasicSetting("split");
-            }
-
-            _splits.Clear();
-            foreach (Split split in _game.Splits)
-            {
-                aslSettings.AddSetting(split.Name, true, split.Name, null);
-                if (!split.IsCategory())
-                {
-                    _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
-                } else
-                {
-                    foreach (Split s in split.Children)
-                    {
-                        _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
-                        aslSettings.AddSetting(s.Name, true, s.Name, split.Name);
-                    }
-                }
-            }
-
-            _aslSettings = aslSettings;
-            _settings.SetASLSettings(aslSettings);
         }
 
         private void _state_OnStart(object sender, EventArgs e)
@@ -484,13 +430,23 @@ namespace LiveSplit.UI.Components
 
         private bool IsConfigReady()
         {
-            if (UpdateConfigFile())
-            { 
+            if (RequireConfigFileUpdate())
+            {
                 try
                 {
-                    SetAutostart();
+                    var jsonString = File.ReadAllText(_settings.ScriptPath);
+                    _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
+                }
+                catch (Exception e)
+                {
+                    Log.Error($"Could not open split config file, check config file settings: {e.Message}");
+                    return false;
+                }
+
+                try
+                {
+                    _autostart = _game.Autostart;
                     SetSplitList();
-                    _do_reload = false;
 
                     CheckRunnableSetting();
 
@@ -504,28 +460,69 @@ namespace LiveSplit.UI.Components
                     Log.Error($"Splits could not be parsed: {e}");
                     return false;
                 }
+
+                _do_reload = false;
             }
 
             return !_do_reload;
         }
 
-        private bool UpdateConfigFile()
+        private void SetSplitList()
+        {
+            var aslSettings = new ASLSettings();
+            if (_autostart != null)
+            {
+                aslSettings.AddBasicSetting("start");
+            }
+            if (_game.Splits.Count > 0)
+            {
+                aslSettings.AddBasicSetting("split");
+            }
+
+            _splits.Clear();
+            foreach (Split split in _game.Splits)
+            {
+                aslSettings.AddSetting(split.Name, split.Active || split.IsCategory(), split.Name, null);
+                if (!split.IsCategory())
+                {
+                    _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
+                }
+                else
+                {
+                    foreach (Split s in split.Children)
+                    {
+                        _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
+                        aslSettings.AddSetting(s.Name, s.Active, s.Name, split.Name);
+                    }
+                }
+            }
+
+            _aslSettings = aslSettings;
+            _settings.SetASLSettings(aslSettings);
+        }
+
+        private bool CheckRunnableSetting()
+        {
+            if (_game == null)
+            {
+                return false;
+            }
+
+            if (_game.Splits.Count == 0)
+            {
+                Log.Error("The config file contains no splits.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool RequireConfigFileUpdate()
         {
             if (_old_script_path == null || _settings.ScriptPath != _old_script_path)
             {
                 _old_script_path = _settings.ScriptPath;
                 _do_reload = true;
-            }
-
-            try
-            {
-                var jsonString = File.ReadAllText(_settings.ScriptPath);
-                _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
-            }
-            catch (Exception e)
-            {
-                Log.Error($"Could not open split config file, check config file settings: {e.Message}");
-                return false;
             }
 
             return _do_reload;
