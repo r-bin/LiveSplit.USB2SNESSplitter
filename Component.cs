@@ -12,6 +12,7 @@ using System.Linq.Expressions;
 using USB2SnesW;
 using System.Drawing;
 using System.Collections;
+using LiveSplit.ASL;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("LiveSplit.USB2SNESSplitterTests")]
 
@@ -36,8 +37,14 @@ namespace LiveSplit.UI.Components
 
     public class USB2SNESComponent : IComponent
     {
+        #region Init
+
         public const uint SD2SNES_WRAM_BASE_ADDRESS = 0xF50000;
         public const uint DEFAULT_READ_SIZE = 64;
+
+        public const bool SETTINGS_RESET = false;
+        public const bool SETTINGS_DEBUG = true;
+        public const bool SETTINGS_HIDE_UI_BAR = false;
 
         enum MyState
         {
@@ -56,9 +63,12 @@ namespace LiveSplit.UI.Components
         internal class Split
         {
             public Split Parent { get; set; }
+            public List<Split> Children { get; set; }
 
-            public string Active { get; set; }
+            public bool Active { get; set; }
             public string Name { get; set; }
+            public string Description { get; set; }
+            public string Tooltip { get; set; }
             public string Address { get; set; }
             public string Value { get; set; }
             public string Type { get; set; }
@@ -72,6 +82,11 @@ namespace LiveSplit.UI.Components
             public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
 
             public uint? PreviousValueInt { get; set; }
+
+            public bool IsCategory()
+            {
+                return Children?.Count > 0;
+            }
 
             public bool Check(byte[] data, bool debug)
             {
@@ -131,18 +146,18 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        class Category
+        class Settings
         {
-            public string Name { get; set; }
-            public List<string> Splits { get; set; }
+            public bool Debug { get; set; }
+            public bool HideConnectionBar { get; set; }
         }
 
         class Game
         {
             public string Name { get; set; }
-            public string Autostart { get; set; }
-            public List<Category> Categories { get; set; }
-            public List<Split> Definitions { get; set; }
+            public Settings Settings { get; set; }
+            public Split Autostart { get; set; }
+            public List<Split> Splits { get; set; }
         }
 
         public string ComponentName => "USB2SNES Auto Splitter";
@@ -172,8 +187,10 @@ namespace LiveSplit.UI.Components
 
         private LiveSplitState _state;
         private ComponentSettings _settings;
+        private ASLSettings _aslSettings;
         private TimerModel _model;
         private Timer _update_timer;
+        private FileSystemWatcher _fs_watcher;
         private bool _do_reload = true;
         private string _old_script_path;
 
@@ -181,7 +198,6 @@ namespace LiveSplit.UI.Components
         private Split _autostart;
         private List<Split> _splits;
         private bool _inTimer;
-        private string _old_category;
 
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
@@ -204,6 +220,11 @@ namespace LiveSplit.UI.Components
             _update_timer = new Timer() { Interval = 1000 };
             _update_timer.Tick += (sender, args) => UpdateSplitsWrapper();
             _update_timer.Enabled = true;
+            _fs_watcher = new FileSystemWatcher();
+            _fs_watcher.Changed += async (sender, args) => {
+                await Task.Delay(200);
+                _do_reload = true;
+            };
             _splits = new List<Split>();
             _inTimer = false;
 
@@ -221,6 +242,10 @@ namespace LiveSplit.UI.Components
             Init(state, usb2snesw);
 
         }
+
+        #endregion
+
+        #region Helpers
 
         private void ShowMessage(String msg)
         {
@@ -293,64 +318,6 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        private bool CheckSplitsSetting()
-        {
-            bool r = true;
-            foreach (var c in _game.Categories)
-            {
-                foreach (var s in c.Splits)
-                {
-                    var d = _game.Definitions.Where(x => x.Name == s).FirstOrDefault();
-                    if (d == null)
-                    {
-                        ShowMessage(String.Format($"Split definition missing: {s} for category {c.Name}"));
-                        r = false;
-                    }
-                }
-            }
-
-            return r;
-        }
-
-        private bool CheckRunnableSetting()
-        {
-            if(_game == null)
-            {
-                return false;
-            }
-
-            List<String> splits = new List<string>(_game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First()?.Splits);
-
-            if (splits.Count == 0)
-            {
-                Log.Error("There are no splits for the current category in the split config file, check that the run category is correctly set and exists in the config file.");
-                return false;
-            }
-            if (_state.Run.Count() != splits.Count())
-            {
-                Log.Error(String.Format($"The segment count <{_splits.Count()}> does not match the Autosplitter setting file <{_state.Run.Count()}>"));
-            }
-
-            return true;
-        }
-
-        // Let's build the split list based on the user segment list and not the category definition
-        private void SetSplitList()
-        {
-            var catSplits = _game.Categories.Where(c => c.Name.ToLower() == _state.Run.CategoryName.ToLower()).First().Splits;
-            var splits = catSplits.Select(Name => _game.Definitions.Where(s => s.Name.ToLower() == Name.ToLower()).First()).ToList();
-
-            _splits.Clear();
-            foreach (Split split in splits)
-            {
-                _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
-            }
-        }
-        private void SetAutostart()
-        {
-            _autostart = _game.Definitions.Where(s => s.Name == _game.Autostart).FirstOrDefault();
-        }
-
         private void _state_OnStart(object sender, EventArgs e)
         {
             foreach (Split split in _splits)
@@ -368,7 +335,7 @@ namespace LiveSplit.UI.Components
 
             if (_usb2snes.Connected())
             {
-                if (_settings.ResetSNES)
+                if (SETTINGS_RESET)
                 {
                     _usb2snes.Reset();
                 }
@@ -378,6 +345,7 @@ namespace LiveSplit.UI.Components
         public void Dispose()
         {
             _update_timer?.Dispose();
+            _fs_watcher?.Dispose();
             if (_usb2snes.Connected())
             {
                 _usb2snes.Disconnect();
@@ -400,6 +368,10 @@ namespace LiveSplit.UI.Components
         {
             _settings.SetSettings(settings);
         }
+
+        #endregion
+
+        #region Update Timer
 
         public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height,
             LayoutMode mode)
@@ -468,13 +440,24 @@ namespace LiveSplit.UI.Components
 
         private bool IsConfigReady()
         {
-            if (UpdateConfigFile())
-            { 
+            if (RequireConfigFileUpdate())
+            {
                 try
                 {
+                    var jsonString = File.ReadAllText(_settings.ScriptPath);
+                    _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
+                }
+                catch (Exception e)
+                {
+                    Log.Error($"Could not open split config file, check config file settings: {e.Message}");
+                    _settings.ResetASLSettings();
+                    return false;
+                }
+
+                try
+                {
+                    _autostart = _game.Autostart;
                     SetSplitList();
-                    SetAutostart();
-                    _do_reload = false;
 
                     CheckRunnableSetting();
 
@@ -486,36 +469,81 @@ namespace LiveSplit.UI.Components
                 } catch (Exception e)
                 {
                     Log.Error($"Splits could not be parsed: {e}");
+                    _settings.ResetASLSettings();
                     return false;
                 }
+
+                _fs_watcher.Path = Path.GetDirectoryName(_settings.ScriptPath);
+                _fs_watcher.Filter = Path.GetFileName(_settings.ScriptPath);
+                _fs_watcher.EnableRaisingEvents = true;
+
+                _do_reload = false;
             }
 
             return !_do_reload;
         }
 
-        private bool UpdateConfigFile()
+        private void SetSplitList()
         {
-            if (_old_script_path == null || _settings.ConfigFile != _old_script_path)
+            var aslSettings = new ASLSettings();
+            if (_autostart != null)
             {
-                _old_script_path = _settings.ConfigFile;
+                aslSettings.AddBasicSetting("start");
+            }
+            if (_game.Splits.Count > 0)
+            {
+                aslSettings.AddBasicSetting("split");
+            }
+
+            _splits.Clear();
+            foreach (Split split in _game.Splits)
+            {
+                aslSettings.AddSetting(split.Name, split.Active || split.IsCategory(), split.Description, null);
+                if (!split.IsCategory())
+                {
+                    _splits.AddRange(Enumerable.Repeat(split, split.Repeat + 1).ToList());
+                }
+                else
+                {
+                    foreach (Split s in split.Children)
+                    {
+                        _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
+                        aslSettings.AddSetting(s.Name, s.Active, s.Description, split.Name);
+                    }
+                }
+            }
+
+            _aslSettings = aslSettings;
+            _settings.SetASLSettings(aslSettings);
+        }
+
+        private bool CheckRunnableSetting()
+        {
+            if (_game == null)
+            {
+                return false;
+            }
+
+            if (_game.Splits.Count == 0)
+            {
+                Log.Error("The config file contains no splits.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool RequireConfigFileUpdate()
+        {
+            if (_old_script_path == null || _settings.ScriptPath != _old_script_path)
+            {
+                _old_script_path = _settings.ScriptPath;
                 _do_reload = true;
             }
 
-            try
+            if (string.IsNullOrEmpty(_settings.ScriptPath))
             {
-                var jsonString = File.ReadAllText(_settings.ConfigFile);
-                _game = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Game>(jsonString);
-            }
-            catch (Exception e)
-            {
-                Log.Error($"Could not open split config file, check config file settings: {e.Message}");
-                return false;
-            }
-
-            if (!CheckSplitsSetting())
-            {
-                Log.Error("The split config file has missing definitions.");
-                return false;
+                _fs_watcher.EnableRaisingEvents = false;
             }
 
             return _do_reload;
@@ -523,15 +551,21 @@ namespace LiveSplit.UI.Components
 
         private async Task CheckSplits()
         {
-            Split split;
-            if (_settings.Autostart && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
+            Split split = null;
+            if (_aslSettings.GetBasicSettingValue("start") && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
             {
                 split = _autostart;
             }
-            else if (_state.CurrentPhase == TimerPhase.Running)
+            else if (_aslSettings.GetBasicSettingValue("split") && _state.CurrentPhase == TimerPhase.Running)
             {
-                split = _splits[_state.CurrentSplitIndex];
-            } else
+                var splits = _splits.Where(s => _aslSettings.OrderedSettings.Where(s2 => s.Name == s2.Id).Any(s2 => s2.Value && (s2.Parent == null || (_aslSettings.OrderedSettings.Where(s3 => s3.Id == s2.Parent).First()?.Value ?? false))));
+                if (splits.Count() > _state.CurrentSplitIndex)
+                {
+                    split = splits.ToArray()[_state.CurrentSplitIndex];
+                }
+            }
+
+            if (split == null)
             {
                 return;
             }
@@ -596,8 +630,12 @@ namespace LiveSplit.UI.Components
                 Console.WriteLine("Get address failed to return result");
                 return false;
             }
-            return split.Check(data, _settings.Debug);
+            return split.Check(data, _game?.Settings?.Debug ?? false);
         }
+
+        #endregion
+
+        #region Connection Bar Drawing
 
         public void DrawHorizontal(Graphics graphics, LiveSplitState state, float height, Region clipRegion)
         {
@@ -607,6 +645,11 @@ namespace LiveSplit.UI.Components
 
         public void DrawVertical(Graphics graphics, LiveSplitState state, float width, Region clipRegion)
         {
+            if(_game?.Settings?.HideConnectionBar ?? false)
+            {
+                return;
+            }
+
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
             Color color;
@@ -619,5 +662,7 @@ namespace LiveSplit.UI.Components
             Brush brush = new SolidBrush(color);
             graphics.FillRectangle(brush, 0, 0, width, 3);
         }
+
+        #endregion
     }
 }
