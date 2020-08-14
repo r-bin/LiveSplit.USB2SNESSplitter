@@ -416,7 +416,7 @@ namespace LiveSplit.UI.Components
         {
             var dialog = new OpenFileDialog()
             {
-                Filter = "Auto Split Script (*.asl)|*.asl|All Files (*.*)|*.*"
+                Filter = "SD2SNES Auto Split Script (*.json)|*.json|All Files (*.*)|*.*"
             };
             if (File.Exists(ScriptPath))
             {
