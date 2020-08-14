@@ -103,8 +103,8 @@ namespace LiveSplit.UI.Components
                     { "<", (v, s, d) => v < s.ValueInt },
                     { ">=", (v, s, d) => v >= s.ValueInt },
                     { "<=", (v, s, d) => v <= s.ValueInt },
-                    { "delta", (v, s, d) => d.HasValue && d >= s.ValueInt },
-                    { "odelta", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
+                    { "delta==", (v, s, d) => d.HasValue && d == s.ValueInt },
+                    { "delta===", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
                 };
 
                 if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
