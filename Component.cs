@@ -422,7 +422,7 @@ namespace LiveSplit.UI.Components
 
         public async Task UpdateSplits()
         {
-            if (!IsConnectionReady() || !IsConfigReady())
+            if (!IsConfigReady() || !IsConnectionReady())
             {
                 _update_timer.Interval = 1000;
                 return;
