@@ -42,10 +42,6 @@ namespace LiveSplit.UI.Components
         public const uint SD2SNES_WRAM_BASE_ADDRESS = 0xF50000;
         public const uint DEFAULT_READ_SIZE = 64;
 
-        public const bool SETTINGS_RESET = false;
-        public const bool SETTINGS_DEBUG = true;
-        public const bool SETTINGS_HIDE_UI_BAR = false;
-
         enum MyState
         {
             NONE,
@@ -103,8 +99,8 @@ namespace LiveSplit.UI.Components
                     { "<", (v, s, d) => v < s.ValueInt },
                     { ">=", (v, s, d) => v >= s.ValueInt },
                     { "<=", (v, s, d) => v <= s.ValueInt },
-                    { "delta", (v, s, d) => d.HasValue && d >= s.ValueInt },
-                    { "odelta", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
+                    { "delta==", (v, s, d) => d.HasValue && d == s.ValueInt },
+                    { "delta===", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
                 };
 
                 if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
@@ -146,15 +142,17 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        class Category
+        class Settings
         {
-            public string Name { get; set; }
-            public List<string> Splits { get; set; }
+            public bool Debug { get; set; }
+            public bool ResetHardware { get; set; }
+            public bool HideConnectionBar { get; set; }
         }
 
         class Game
         {
             public string Name { get; set; }
+            public Settings Settings { get; set; }
             public Split Autostart { get; set; }
             public List<Split> Splits { get; set; }
         }
@@ -334,7 +332,7 @@ namespace LiveSplit.UI.Components
 
             if (_usb2snes.Connected())
             {
-                if (SETTINGS_RESET)
+                if (_game?.Settings?.ResetHardware ?? false)
                 {
                     _usb2snes.Reset();
                 }
@@ -629,7 +627,7 @@ namespace LiveSplit.UI.Components
                 Console.WriteLine("Get address failed to return result");
                 return false;
             }
-            return split.Check(data, SETTINGS_DEBUG);
+            return split.Check(data, _game?.Settings?.Debug ?? false);
         }
 
         #endregion
@@ -644,7 +642,7 @@ namespace LiveSplit.UI.Components
 
         public void DrawVertical(Graphics graphics, LiveSplitState state, float width, Region clipRegion)
         {
-            if(SETTINGS_HIDE_UI_BAR)
+            if(_game?.Settings?.HideConnectionBar ?? false)
             {
                 return;
             }

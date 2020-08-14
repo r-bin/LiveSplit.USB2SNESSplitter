@@ -11,7 +11,7 @@ namespace LiveSplit.UI.Components
         public string ComponentName => "USB2SNES Auto Splitter";
         public string Description => "Uses the SD2SNES USB2SNES firmware to monitor RAM for auto splitting.";
         public ComponentCategory Category => ComponentCategory.Control;
-        public Version Version => Version.Parse("1.0.0");
+        public Version Version => Version.Parse("1.1.0");
 
         public string UpdateName => ComponentName;
         public string UpdateURL => "";
