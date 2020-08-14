@@ -189,6 +189,7 @@ namespace LiveSplit.UI.Components
         private ASLSettings _aslSettings;
         private TimerModel _model;
         private Timer _update_timer;
+        private FileSystemWatcher _fs_watcher;
         private bool _do_reload = true;
         private string _old_script_path;
 
@@ -218,6 +219,11 @@ namespace LiveSplit.UI.Components
             _update_timer = new Timer() { Interval = 1000 };
             _update_timer.Tick += (sender, args) => UpdateSplitsWrapper();
             _update_timer.Enabled = true;
+            _fs_watcher = new FileSystemWatcher();
+            _fs_watcher.Changed += async (sender, args) => {
+                await Task.Delay(200);
+                _do_reload = true;
+            };
             _splits = new List<Split>();
             _inTimer = false;
 
@@ -338,6 +344,7 @@ namespace LiveSplit.UI.Components
         public void Dispose()
         {
             _update_timer?.Dispose();
+            _fs_watcher?.Dispose();
             if (_usb2snes.Connected())
             {
                 _usb2snes.Disconnect();
@@ -442,6 +449,7 @@ namespace LiveSplit.UI.Components
                 catch (Exception e)
                 {
                     Log.Error($"Could not open split config file, check config file settings: {e.Message}");
+                    _settings.ResetASLSettings();
                     return false;
                 }
 
@@ -460,8 +468,13 @@ namespace LiveSplit.UI.Components
                 } catch (Exception e)
                 {
                     Log.Error($"Splits could not be parsed: {e}");
+                    _settings.ResetASLSettings();
                     return false;
                 }
+
+                _fs_watcher.Path = Path.GetDirectoryName(_settings.ScriptPath);
+                _fs_watcher.Filter = Path.GetFileName(_settings.ScriptPath);
+                _fs_watcher.EnableRaisingEvents = true;
 
                 _do_reload = false;
             }
@@ -525,6 +538,11 @@ namespace LiveSplit.UI.Components
             {
                 _old_script_path = _settings.ScriptPath;
                 _do_reload = true;
+            }
+
+            if (string.IsNullOrEmpty(_settings.ScriptPath))
+            {
+                _fs_watcher.EnableRaisingEvents = false;
             }
 
             return _do_reload;
