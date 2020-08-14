@@ -42,10 +42,6 @@ namespace LiveSplit.UI.Components
         public const uint SD2SNES_WRAM_BASE_ADDRESS = 0xF50000;
         public const uint DEFAULT_READ_SIZE = 64;
 
-        public const bool SETTINGS_RESET = false;
-        public const bool SETTINGS_DEBUG = true;
-        public const bool SETTINGS_HIDE_UI_BAR = false;
-
         enum MyState
         {
             NONE,
@@ -103,8 +99,8 @@ namespace LiveSplit.UI.Components
                     { "<", (v, s, d) => v < s.ValueInt },
                     { ">=", (v, s, d) => v >= s.ValueInt },
                     { "<=", (v, s, d) => v <= s.ValueInt },
-                    { "delta", (v, s, d) => d.HasValue && d >= s.ValueInt },
-                    { "odelta", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
+                    { "delta==", (v, s, d) => d.HasValue && d == s.ValueInt },
+                    { "delta===", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
                 };
 
                 if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
@@ -149,6 +145,7 @@ namespace LiveSplit.UI.Components
         class Settings
         {
             public bool Debug { get; set; }
+            public bool ResetHardware { get; set; }
             public bool HideConnectionBar { get; set; }
         }
 
@@ -335,7 +332,7 @@ namespace LiveSplit.UI.Components
 
             if (_usb2snes.Connected())
             {
-                if (SETTINGS_RESET)
+                if (_game?.Settings?.ResetHardware ?? false)
                 {
                     _usb2snes.Reset();
                 }
