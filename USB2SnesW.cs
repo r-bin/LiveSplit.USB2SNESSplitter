@@ -46,17 +46,40 @@ namespace USB2SnesW
         }
         public async Task<bool> Connect()
         {
-            Debug.WriteLine("ws.ReadyState: " + ws.ReadyState);
             if (ws.ReadyState == WebSocketState.Open)
-                return true;
-            /*if (ws.ReadyState == WebSocketState.Aborted || ws.State == WebSocketState.CloseReceived)
             {
-                ws.Dispose();
-                ws = new ClientWebSocket();
-            }*/
+                return true;
+            }
+
             var tcs = new TaskCompletionSource<bool>();
-            ws.OnOpen += (s, e) => { Console.WriteLine("Ok"); tcs.TrySetResult(true); };
-            ws.OnError += (s, e) => { Console.WriteLine("Error"); tcs.TrySetResult(false); };
+            EventHandler openHandler = null;
+            EventHandler<ErrorEventArgs> errorHandler = null;
+            EventHandler<CloseEventArgs> closeHandler = null;
+            openHandler = (socket, eventArgs) => {
+                ws.OnOpen -= openHandler;
+                ws.OnClose -= closeHandler;
+                ws.OnError -= errorHandler;
+
+                tcs.TrySetResult(true);
+            };
+            errorHandler = (socket, eventArgs) => {
+                ws.OnOpen -= openHandler;
+                ws.OnClose -= closeHandler;
+                ws.OnError -= errorHandler;
+
+                tcs.TrySetResult(false);
+            };
+            closeHandler = (socket, eventArgs) => {
+                ws.OnOpen -= openHandler;
+                ws.OnClose -= closeHandler;
+                ws.OnError -= errorHandler;
+
+                tcs.TrySetResult(false);
+            };
+            ws.OnOpen += openHandler;
+            ws.OnError += errorHandler;
+            ws.OnClose += closeHandler;
+
             try
             {
                 ws.ConnectAsync();
@@ -79,7 +102,6 @@ namespace USB2SnesW
             req.Opcode = cmd.ToString();
             req.Space = "SNES";
             req.Operands = args;
-            //Console.WriteLine(cmd);
             string json = new JavaScriptSerializer().Serialize(req);
             ws.Send(json);
         }
@@ -111,8 +133,6 @@ namespace USB2SnesW
                 ws.OnClose -= closeHandler;
                 ws.OnError -= errorHandler;
 
-                Console.WriteLine("Error in wait for reply : " + e.Message);
-                // errorHandler and closeHandler can both be called for the same event, and SetCanceled is not re-entrant
                 tcs.TrySetCanceled();
             };
             
@@ -122,13 +142,15 @@ namespace USB2SnesW
                 ws.OnClose -= closeHandler;
                 ws.OnError -= errorHandler;
 
-                Console.WriteLine("wsAttach: Connection closed");
-                // errorHandler and closeHandler can both be called for the same event, and SetCanceled is not re-entrant
                 tcs.TrySetCanceled();
             };
             ws.OnMessage += msgHandler;
             ws.OnError += errorHandler;
             ws.OnClose += closeHandler;
+
+            var ct = new CancellationTokenSource(2000);
+            ct.Token.Register(() => tcs.TrySetCanceled(), useSynchronizationContext: false);
+
             return await tcs.Task;
         }
         public async Task<List<String>> GetDevices()
@@ -170,7 +192,6 @@ namespace USB2SnesW
                 Console.WriteLine("Error in get address : " + e.Message);
                 tcs.SetCanceled();
             };
-
             closeHandler = (s, e) =>
             {
                 ws.OnMessage -= msgHandler;
@@ -183,6 +204,7 @@ namespace USB2SnesW
             ws.OnMessage += msgHandler;
             ws.OnError += errorHandler;
             ws.OnClose += closeHandler;
+
             if (await Task.WhenAny(tcs.Task, Task.Delay(100)) == tcs.Task)
             {
                 return tcs.Task.Result;
@@ -197,7 +219,6 @@ namespace USB2SnesW
         public bool Connected()
         {
             bool live = ws.IsAlive;
-            Debug.WriteLine("ws Checking connected " + live);
             return live;
         }
         public void Disconnect()
