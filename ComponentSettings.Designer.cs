@@ -30,6 +30,9 @@
         {
             this.components = new System.ComponentModel.Container();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
+            this.flowLayoutPanel3 = new System.Windows.Forms.FlowLayoutPanel();
+            this.checkboxResetHardware = new System.Windows.Forms.CheckBox();
+            this.checkboxDebug = new System.Windows.Forms.CheckBox();
             this.labelScriptPath = new System.Windows.Forms.Label();
             this.btnSelectFile = new System.Windows.Forms.Button();
             this.txtScriptPath = new System.Windows.Forms.TextBox();
@@ -37,6 +40,7 @@
             this.btnCheckAll = new System.Windows.Forms.Button();
             this.btnUncheckAll = new System.Windows.Forms.Button();
             this.btnResetToDefault = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
             this.flowLayoutPanel2 = new System.Windows.Forms.FlowLayoutPanel();
             this.checkboxStart = new System.Windows.Forms.CheckBox();
             this.checkboxSplit = new System.Windows.Forms.CheckBox();
@@ -44,7 +48,9 @@
             this.lblGameVersion = new System.Windows.Forms.Label();
             this.labelOptions = new System.Windows.Forms.Label();
             this.labelCustomSettings = new System.Windows.Forms.Label();
-            this.treeCustomSettings = new LiveSplit.UI.Components.NewTreeView();
+            this.labelDevice = new System.Windows.Forms.Label();
+            this.btnDetectDevice = new System.Windows.Forms.Button();
+            this.txtDevice = new System.Windows.Forms.TextBox();
             this.treeContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.cmiExpandTree = new System.Windows.Forms.ToolStripMenuItem();
             this.cmiCollapseTree = new System.Windows.Forms.ToolStripMenuItem();
@@ -64,10 +70,9 @@
             this.cmiCollapseTreeToSelection2 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.resetSettingToDefaultToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.labelDevice = new System.Windows.Forms.Label();
-            this.btnDetectDevice = new System.Windows.Forms.Button();
-            this.txtDevice = new System.Windows.Forms.TextBox();
+            this.treeCustomSettings = new LiveSplit.UI.Components.NewTreeView();
             this.tableLayoutPanel1.SuspendLayout();
+            this.flowLayoutPanel3.SuspendLayout();
             this.flowLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel2.SuspendLayout();
             this.treeContextMenu.SuspendLayout();
@@ -81,34 +86,71 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 76F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel1.Controls.Add(this.labelScriptPath, 0, 1);
-            this.tableLayoutPanel1.Controls.Add(this.btnSelectFile, 2, 1);
-            this.tableLayoutPanel1.Controls.Add(this.txtScriptPath, 1, 1);
-            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel1, 1, 4);
-            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel2, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.labelOptions, 0, 2);
-            this.tableLayoutPanel1.Controls.Add(this.labelCustomSettings, 0, 3);
-            this.tableLayoutPanel1.Controls.Add(this.treeCustomSettings, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel3, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.labelScriptPath, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.btnSelectFile, 2, 2);
+            this.tableLayoutPanel1.Controls.Add(this.txtScriptPath, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel1, 1, 5);
+            this.tableLayoutPanel1.Controls.Add(this.label1, 0, 1);
+            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel2, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.labelOptions, 0, 3);
+            this.tableLayoutPanel1.Controls.Add(this.labelCustomSettings, 0, 4);
+            this.tableLayoutPanel1.Controls.Add(this.treeCustomSettings, 1, 4);
             this.tableLayoutPanel1.Controls.Add(this.labelDevice, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.btnDetectDevice, 2, 0);
             this.tableLayoutPanel1.Controls.Add(this.txtDevice, 1, 0);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(7, 7);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 5;
+            this.tableLayoutPanel1.RowCount = 6;
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 29F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 29F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(462, 518);
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(462, 545);
             this.tableLayoutPanel1.TabIndex = 0;
+            // 
+            // flowLayoutPanel3
+            // 
+            this.flowLayoutPanel3.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.flowLayoutPanel3.AutoSize = true;
+            this.tableLayoutPanel1.SetColumnSpan(this.flowLayoutPanel3, 2);
+            this.flowLayoutPanel3.Controls.Add(this.checkboxResetHardware);
+            this.flowLayoutPanel3.Controls.Add(this.checkboxDebug);
+            this.flowLayoutPanel3.Location = new System.Drawing.Point(79, 32);
+            this.flowLayoutPanel3.Name = "flowLayoutPanel3";
+            this.flowLayoutPanel3.Size = new System.Drawing.Size(380, 23);
+            this.flowLayoutPanel3.TabIndex = 18;
+            // 
+            // checkboxResetHardware
+            // 
+            this.checkboxResetHardware.Enabled = false;
+            this.checkboxResetHardware.Location = new System.Drawing.Point(3, 3);
+            this.checkboxResetHardware.Name = "checkboxResetHardware";
+            this.checkboxResetHardware.Size = new System.Drawing.Size(105, 17);
+            this.checkboxResetHardware.TabIndex = 0;
+            this.checkboxResetHardware.Text = "Reset Hardware";
+            this.checkboxResetHardware.UseVisualStyleBackColor = true;
+            this.checkboxResetHardware.CheckedChanged += new System.EventHandler(this.methodCheckbox_CheckedChanged);
+            // 
+            // checkboxDebug
+            // 
+            this.checkboxDebug.Enabled = false;
+            this.checkboxDebug.Location = new System.Drawing.Point(114, 3);
+            this.checkboxDebug.Name = "checkboxDebug";
+            this.checkboxDebug.Size = new System.Drawing.Size(60, 17);
+            this.checkboxDebug.TabIndex = 0;
+            this.checkboxDebug.Text = "Debug";
+            this.checkboxDebug.UseVisualStyleBackColor = true;
+            this.checkboxDebug.CheckedChanged += new System.EventHandler(this.methodCheckbox_CheckedChanged);
             // 
             // labelScriptPath
             // 
             this.labelScriptPath.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.labelScriptPath.AutoSize = true;
-            this.labelScriptPath.Location = new System.Drawing.Point(3, 37);
+            this.labelScriptPath.Location = new System.Drawing.Point(3, 66);
             this.labelScriptPath.Name = "labelScriptPath";
             this.labelScriptPath.Size = new System.Drawing.Size(70, 13);
             this.labelScriptPath.TabIndex = 3;
@@ -117,7 +159,7 @@
             // btnSelectFile
             // 
             this.btnSelectFile.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnSelectFile.Location = new System.Drawing.Point(385, 32);
+            this.btnSelectFile.Location = new System.Drawing.Point(385, 61);
             this.btnSelectFile.Name = "btnSelectFile";
             this.btnSelectFile.Size = new System.Drawing.Size(74, 23);
             this.btnSelectFile.TabIndex = 1;
@@ -128,7 +170,7 @@
             // txtScriptPath
             // 
             this.txtScriptPath.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtScriptPath.Location = new System.Drawing.Point(79, 33);
+            this.txtScriptPath.Location = new System.Drawing.Point(79, 62);
             this.txtScriptPath.Name = "txtScriptPath";
             this.txtScriptPath.Size = new System.Drawing.Size(300, 20);
             this.txtScriptPath.TabIndex = 0;
@@ -141,7 +183,7 @@
             this.flowLayoutPanel1.Controls.Add(this.btnCheckAll);
             this.flowLayoutPanel1.Controls.Add(this.btnUncheckAll);
             this.flowLayoutPanel1.Controls.Add(this.btnResetToDefault);
-            this.flowLayoutPanel1.Location = new System.Drawing.Point(205, 486);
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(205, 513);
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
             this.flowLayoutPanel1.Size = new System.Drawing.Size(254, 29);
             this.flowLayoutPanel1.TabIndex = 8;
@@ -179,6 +221,16 @@
             this.btnResetToDefault.UseVisualStyleBackColor = true;
             this.btnResetToDefault.Click += new System.EventHandler(this.btnResetToDefault_Click);
             // 
+            // label1
+            // 
+            this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(3, 37);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(70, 13);
+            this.label1.TabIndex = 12;
+            this.label1.Text = "Options:";
+            // 
             // flowLayoutPanel2
             // 
             this.flowLayoutPanel2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
@@ -188,7 +240,7 @@
             this.flowLayoutPanel2.Controls.Add(this.checkboxSplit);
             this.flowLayoutPanel2.Controls.Add(this.checkboxReset);
             this.flowLayoutPanel2.Controls.Add(this.lblGameVersion);
-            this.flowLayoutPanel2.Location = new System.Drawing.Point(79, 61);
+            this.flowLayoutPanel2.Location = new System.Drawing.Point(79, 90);
             this.flowLayoutPanel2.Name = "flowLayoutPanel2";
             this.flowLayoutPanel2.Size = new System.Drawing.Size(380, 23);
             this.flowLayoutPanel2.TabIndex = 12;
@@ -241,7 +293,7 @@
             // 
             this.labelOptions.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.labelOptions.AutoSize = true;
-            this.labelOptions.Location = new System.Drawing.Point(3, 66);
+            this.labelOptions.Location = new System.Drawing.Point(3, 95);
             this.labelOptions.Name = "labelOptions";
             this.labelOptions.Size = new System.Drawing.Size(70, 13);
             this.labelOptions.TabIndex = 9;
@@ -250,28 +302,41 @@
             // labelCustomSettings
             // 
             this.labelCustomSettings.AutoSize = true;
-            this.labelCustomSettings.Location = new System.Drawing.Point(3, 92);
+            this.labelCustomSettings.Location = new System.Drawing.Point(3, 121);
             this.labelCustomSettings.Margin = new System.Windows.Forms.Padding(3, 5, 3, 0);
             this.labelCustomSettings.Name = "labelCustomSettings";
             this.labelCustomSettings.Size = new System.Drawing.Size(59, 13);
             this.labelCustomSettings.TabIndex = 13;
             this.labelCustomSettings.Text = "Advanced:";
             // 
-            // treeCustomSettings
+            // labelDevice
             // 
-            this.treeCustomSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.treeCustomSettings.CheckBoxes = true;
-            this.tableLayoutPanel1.SetColumnSpan(this.treeCustomSettings, 2);
-            this.treeCustomSettings.Location = new System.Drawing.Point(79, 90);
-            this.treeCustomSettings.Name = "treeCustomSettings";
-            this.treeCustomSettings.ShowNodeToolTips = true;
-            this.treeCustomSettings.Size = new System.Drawing.Size(380, 390);
-            this.treeCustomSettings.TabIndex = 14;
-            this.treeCustomSettings.BeforeCheck += new System.Windows.Forms.TreeViewCancelEventHandler(this.settingsTree_BeforeCheck);
-            this.treeCustomSettings.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.settingsTree_AfterCheck);
-            this.treeCustomSettings.NodeMouseClick += new System.Windows.Forms.TreeNodeMouseClickEventHandler(this.settingsTree_NodeMouseClick);
+            this.labelDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.labelDevice.AutoSize = true;
+            this.labelDevice.Location = new System.Drawing.Point(3, 8);
+            this.labelDevice.Name = "labelDevice";
+            this.labelDevice.Size = new System.Drawing.Size(70, 13);
+            this.labelDevice.TabIndex = 15;
+            this.labelDevice.Text = "Device:";
+            // 
+            // btnDetectDevice
+            // 
+            this.btnDetectDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnDetectDevice.Location = new System.Drawing.Point(385, 3);
+            this.btnDetectDevice.Name = "btnDetectDevice";
+            this.btnDetectDevice.Size = new System.Drawing.Size(74, 23);
+            this.btnDetectDevice.TabIndex = 16;
+            this.btnDetectDevice.Text = "Detect";
+            this.btnDetectDevice.UseVisualStyleBackColor = true;
+            this.btnDetectDevice.Click += new System.EventHandler(this.btnDetectDevice_Click);
+            // 
+            // txtDevice
+            // 
+            this.txtDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtDevice.Location = new System.Drawing.Point(79, 4);
+            this.txtDevice.Name = "txtDevice";
+            this.txtDevice.Size = new System.Drawing.Size(300, 20);
+            this.txtDevice.TabIndex = 17;
             // 
             // treeContextMenu
             // 
@@ -414,34 +479,21 @@
             this.resetSettingToDefaultToolStripMenuItem.Text = "Reset Setting to Default";
             this.resetSettingToDefaultToolStripMenuItem.Click += new System.EventHandler(this.cmiResetSettingToDefault_Click);
             // 
-            // labelDevice
+            // treeCustomSettings
             // 
-            this.labelDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelDevice.AutoSize = true;
-            this.labelDevice.Location = new System.Drawing.Point(3, 8);
-            this.labelDevice.Name = "labelDevice";
-            this.labelDevice.Size = new System.Drawing.Size(70, 13);
-            this.labelDevice.TabIndex = 15;
-            this.labelDevice.Text = "Device:";
-            // 
-            // btnDetectDevice
-            // 
-            this.btnDetectDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnDetectDevice.Location = new System.Drawing.Point(385, 3);
-            this.btnDetectDevice.Name = "btnDetectDevice";
-            this.btnDetectDevice.Size = new System.Drawing.Size(74, 23);
-            this.btnDetectDevice.TabIndex = 16;
-            this.btnDetectDevice.Text = "Detect";
-            this.btnDetectDevice.UseVisualStyleBackColor = true;
-            this.btnDetectDevice.Click += new System.EventHandler(this.btnDetectDevice_Click);
-            // 
-            // txtDevice
-            // 
-            this.txtDevice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtDevice.Location = new System.Drawing.Point(79, 4);
-            this.txtDevice.Name = "txtDevice";
-            this.txtDevice.Size = new System.Drawing.Size(300, 20);
-            this.txtDevice.TabIndex = 17;
+            this.treeCustomSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.treeCustomSettings.CheckBoxes = true;
+            this.tableLayoutPanel1.SetColumnSpan(this.treeCustomSettings, 2);
+            this.treeCustomSettings.Location = new System.Drawing.Point(79, 119);
+            this.treeCustomSettings.Name = "treeCustomSettings";
+            this.treeCustomSettings.ShowNodeToolTips = true;
+            this.treeCustomSettings.Size = new System.Drawing.Size(380, 388);
+            this.treeCustomSettings.TabIndex = 14;
+            this.treeCustomSettings.BeforeCheck += new System.Windows.Forms.TreeViewCancelEventHandler(this.settingsTree_BeforeCheck);
+            this.treeCustomSettings.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.settingsTree_AfterCheck);
+            this.treeCustomSettings.NodeMouseClick += new System.Windows.Forms.TreeNodeMouseClickEventHandler(this.settingsTree_NodeMouseClick);
             // 
             // ComponentSettings
             // 
@@ -450,9 +502,10 @@
             this.Controls.Add(this.tableLayoutPanel1);
             this.Name = "ComponentSettings";
             this.Padding = new System.Windows.Forms.Padding(7);
-            this.Size = new System.Drawing.Size(476, 532);
+            this.Size = new System.Drawing.Size(476, 559);
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
+            this.flowLayoutPanel3.ResumeLayout(false);
             this.flowLayoutPanel1.ResumeLayout(false);
             this.flowLayoutPanel1.PerformLayout();
             this.flowLayoutPanel2.ResumeLayout(false);
@@ -503,5 +556,9 @@
         private System.Windows.Forms.Label labelDevice;
         private System.Windows.Forms.Button btnDetectDevice;
         public System.Windows.Forms.TextBox txtDevice;
+        private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel3;
+        private System.Windows.Forms.CheckBox checkboxResetHardware;
+        private System.Windows.Forms.CheckBox checkboxDebug;
+        private System.Windows.Forms.Label label1;
     }
 }

@@ -55,6 +55,9 @@ namespace LiveSplit.UI.Components
 
             _basic_settings = new Dictionary<string, CheckBox> {
                 // Capitalized names for saving it in XML.
+                ["ResetHardware"] = checkboxResetHardware,
+                ["Debug"] = checkboxDebug,
+
                 ["Start"] = checkboxStart,
                 ["Reset"] = checkboxReset,
                 ["Split"] = checkboxSplit
