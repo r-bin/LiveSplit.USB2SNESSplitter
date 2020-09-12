@@ -254,7 +254,6 @@ namespace LiveSplit.UI.Components
             {
                 return;
             }
-            Log.Info($"USB2SNES state = {state}");
             _stateChanged = true;
             _mystate = state;
         }
@@ -272,46 +271,59 @@ namespace LiveSplit.UI.Components
                 devices = new List<String>();
             }
 
-            if (!devices.Contains(_settings.Device))
+            if (devices.Count > 0)
             {
-                if (prevState == ProtocolState.NONE)
-                    Log.Info($"Could not find the device '{_settings.Device}'. Check your configuration or activate your device.");
-                return;
+                var device = devices.Contains(_settings.Device) ? _settings.Device : devices.Last();
+
+                _usb2snes.Attach(device);
             }
-            _usb2snes.Attach(_settings.Device);
+            
             var info = await _usb2snes.Info(); // Info is the only neutral way to know if we are attached to the device
-            if (info.version == "")
+            if (!String.IsNullOrEmpty(info?.version))
             {
-                SetState(MyState.ERROR);
-            } else {
                 SetState(MyState.READY);
                 _proto_state = ProtocolState.ATTACHED;
+            } else
+            {
+                Disconnect();
             }
         }
 
         private void Connect()
         {
+            if(_proto_state != ProtocolState.NONE)
+            {
+                return;
+            }
+
             ProtocolState prevState = _proto_state;
-            var connected = _usb2snes.Connected();
-            if (_proto_state != ProtocolState.CONNECTED || !connected)
+            if (_mystate != MyState.CONNECTING && _mystate != MyState.READY)
             {
                 SetState(MyState.CONNECTING);
-                Task<bool> t = _usb2snes.Connect();
-                t.ContinueWith((t1) =>
+                Task<bool> connectTask = _usb2snes.Connect();
+                connectTask.ContinueWith((connectResultTask) =>
                 {
-                    if (!t1.Result)
+                    if (connectResultTask.Result)
+                    {
+                        _usb2snes.SetName("LiveSplit AutoSplitter");
+                        _proto_state = ProtocolState.CONNECTED;
+                        WsAttach(prevState);
+                    } else
                     {
                         SetState(MyState.NONE);
                         _proto_state = ProtocolState.NONE;
-                        return;
                     }
-                    _usb2snes.SetName("LiveSplit AutoSplitter");
-                    _proto_state = ProtocolState.CONNECTED;
-                    WsAttach(prevState);
                 });
-            } else {
-                if (connected)
-                    WsAttach(prevState);
+            }
+        }
+
+        private void Disconnect()
+        {
+            if(_proto_state != ProtocolState.NONE)
+            {
+                _mystate = MyState.NONE;
+                _proto_state = ProtocolState.NONE;
+                _usb2snes.Disconnect(); 
             }
         }
 
@@ -380,26 +392,6 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        private bool IsConnectionReady()
-        {
-            if (_proto_state == ProtocolState.ATTACHED)
-            {
-                return true;
-            }
-
-            Log.Info("Connection failed, trying again...");
-
-            // this method actually does a BLOCKING request-response cycle (!!)
-            if (!_usb2snes.Connected())
-            {
-                SetState(MyState.NONE);
-                _proto_state = ProtocolState.NONE;
-            }
-
-            Connect();
-            return false;
-        }
-
         private async void UpdateSplitsWrapper()
         {
             // "_inTimer" is a very questionable attempt at locking, but it's probably fine here.
@@ -410,29 +402,31 @@ namespace LiveSplit.UI.Components
             _inTimer = true;
             try
             {
-                await UpdateSplits();
+                await UpdateState();
             }  catch (Exception e)
             {
                 Log.Error($"Something bad happened: {e}");
-                Connect();
             } finally {
                 _inTimer = false;
             }
         }
 
-        public async Task UpdateSplits()
+        public async Task UpdateState()
         {
-            if (!IsConnectionReady() || !IsConfigReady())
+            if (!IsConfigReady())
             {
                 _update_timer.Interval = 1000;
-                return;
+            }
+            else if (_mystate != MyState.READY)
+            {
+                _update_timer.Interval = 1000;
+                Connect();
             }
             else
             {
                 _update_timer.Interval = 33;
+                await CheckSplits();
             }
-                        
-            await CheckSplits();
         }
 
         private bool IsConfigReady()
@@ -620,11 +614,14 @@ namespace LiveSplit.UI.Components
             }
             catch
             {
+                Console.WriteLine("GetAddress failed to return result");
+                Disconnect();
                 return false;
             }
             if (data.Count() == 0)
             {
                 Console.WriteLine("Get address failed to return result");
+                Disconnect();
                 return false;
             }
             return split.Check(data, _game?.Settings?.Debug ?? false);
