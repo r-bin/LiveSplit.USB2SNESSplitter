@@ -651,7 +651,8 @@ namespace LiveSplit.UI.Components
             {
                 case MyState.READY: color = _ok_color; break;
                 case MyState.CONNECTING: color = _connecting_color; break;
-                default: color = _error_color; break;
+                case MyState.ERROR: color = _error_color; break;
+                default: color = _connecting_color; break;
             }
             Brush brush = new SolidBrush(color);
             graphics.FillRectangle(brush, 0, 0, width, 3);
