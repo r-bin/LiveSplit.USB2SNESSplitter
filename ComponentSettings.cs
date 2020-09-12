@@ -403,11 +403,10 @@ namespace LiveSplit.UI.Components
 
             if (usb.Connected())
             {
-                List<String> devices;
-                devices = await usb.GetDevices();
+                List<String> devices = await usb.GetDevices();
                 if (devices.Count > 0)
                 {
-                    txtDevice.Text = devices[0];
+                    txtDevice.Text = devices[devices.Count - 1];
                 }
                 return;
             }
