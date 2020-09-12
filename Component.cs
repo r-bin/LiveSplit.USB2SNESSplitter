@@ -142,13 +142,6 @@ namespace LiveSplit.UI.Components
             }
         }
 
-        class Settings
-        {
-            public bool Debug { get; set; }
-            public bool ResetHardware { get; set; }
-            public bool HideConnectionBar { get; set; }
-        }
-
         class Game
         {
             public string Name { get; set; }
@@ -344,7 +337,7 @@ namespace LiveSplit.UI.Components
 
             if (_usb2snes.Connected())
             {
-                if (_game?.Settings?.ResetHardware ?? false)
+                if (_aslSettings.GetBasicSettingValue("resethardware"))
                 {
                     _usb2snes.Reset();
                 }
@@ -477,6 +470,8 @@ namespace LiveSplit.UI.Components
         private void SetSplitList()
         {
             var aslSettings = new ASLSettings();
+            aslSettings.AddBasicSetting("resethardware");
+            aslSettings.AddBasicSetting("debug");
             if (_autostart != null)
             {
                 aslSettings.AddBasicSetting("start");
@@ -624,7 +619,7 @@ namespace LiveSplit.UI.Components
                 Disconnect();
                 return false;
             }
-            return split.Check(data, _game?.Settings?.Debug ?? false);
+            return split.Check(data, _aslSettings.GetBasicSettingValue("debug"));
         }
 
         #endregion
@@ -639,11 +634,6 @@ namespace LiveSplit.UI.Components
 
         public void DrawVertical(Graphics graphics, LiveSplitState state, float width, Region clipRegion)
         {
-            if(_game?.Settings?.HideConnectionBar ?? false)
-            {
-                return;
-            }
-
             VerticalHeight = 3 + PaddingTop + PaddingBottom;
             HorizontalWidth = width;
             Color color;
