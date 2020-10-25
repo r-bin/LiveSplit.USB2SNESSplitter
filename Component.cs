@@ -93,6 +93,21 @@ namespace LiveSplit.UI.Components
             public void Reset()
             {
             }
+
+            public (uint Min, uint Max, uint Size) GetCheckRange()
+            {
+                var min = Checks.Min(c => c.AddressInt);
+                var max = Checks.Max(c => c.AddressInt + c.Size());
+
+                var size = max - min;
+
+                return (min, max, size);
+            }
+
+            public String DebugDescription()
+            {
+                return $"{ this.Description ?? this.Name ?? "<Missing Name>"} ({ this.Checks.Count} checks, { this.GetCheckRange().Size} bytes)";
+            }
         }
 
         internal class Check
@@ -109,6 +124,10 @@ namespace LiveSplit.UI.Components
             public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
             public uint OldValueInt { get { return OldValue.ToFormattedUInt32(); } }
 
+            private uint? _currentValue;
+            private uint? _oldValue;
+            private int? _delta;
+
             public bool Perform(byte[] wram, byte[] data, bool debug)
             {
                 var types = new Dictionary<string, Func<byte[], uint>>()
@@ -116,60 +135,63 @@ namespace LiveSplit.UI.Components
                     { "byte", array => (uint)array[0] },
                     { "short", array => (uint)(array[0] + (array[1] << 8)) },
                 };
-                var operators = new Dictionary<string, Func<Check, uint, uint, int?, bool>>()
+                var operators = new Dictionary<string, Func<uint?, uint?, bool>>()
                 {
-                    { "&", (check, value1, value2, delta12) => (value1 & value2) == value1 },
-                    { "==", (check, value1, value2, delta12) => value1 == value2 },
-                    { "!=", (check, value1, value2, delta12) => value1 != value2 },
-                    { ">", (check, value1, value2, delta12) => value1 > value2 },
-                    { "<", (check, value1, value2, delta12) => value1 < value2 },
-                    { ">=", (check, value1, value2, delta12) => value1 >= value2 },
-                    { "<=", (check, value1, value2, delta12) => value1 <= value2 },
+                    { "&", (value1, value2) => (value1 & value2) == value2 },
+                    { "==", (value1, value2) => value1 == value2 },
+                    { "!=", (value1, value2) => value1 != value2 },
+                    { ">", (value1, value2) => value1 > value2 },
+                    { "<", (value1, value2) => value1 < value2 },
+                    { ">=", (value1, value2) => value1 >= value2 },
+                    { "<=", (value1, value2) => value1 <= value2 },
+                    { "delta", (value1, value2) => _delta.HasValue && _delta == value2 },
+                    { "o-delta", (value1, value2) => _oldValue.HasValue && (((int)_oldValue + (int)ValueInt) & 0xffff) == _currentValue },
                 };
 
                 if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
                 {
                     type = types["short"];
                 }
-                uint currentValue = type(data.Skip((int) this.AddressInt).ToArray());
-                uint? oldValue = null;
+                _currentValue = type(data.Skip((int) this.AddressInt).ToArray());
                 if(wram != null)
                 {
-                    oldValue = type(wram.Skip((int)this.AddressInt).ToArray());
+                    _oldValue = type(wram.Skip((int)this.AddressInt).ToArray());
                 }
 
-                int? delta = null;
-                if (oldValue.HasValue)
+                if (_oldValue.HasValue)
                 {
-                    delta = (int)currentValue - (int)oldValue;
+                    _delta = (int)_currentValue - (int)_oldValue;
                 }
 
                 bool result = true;
+                bool resultValid = false;
 
                 String debugInfo = "";
                 if (Value != null)
                 {
-                    result &= operators[this.Operator](this, currentValue, ValueInt, delta);
-                    debugInfo += $"{currentValue}{this.Operator}{this.ValueInt} == {result}";
+                    result &= operators[this.Operator](_currentValue, ValueInt);
+                    resultValid = true;
+                    debugInfo += $"{_currentValue}{this.Operator}{this.ValueInt} == {result}";
                 }
-                if (OldValue != null && oldValue.HasValue)
+                if (OldValue != null && _oldValue.HasValue)
                 {
-                    result &= operators[this.Operator](this, (uint) oldValue, OldValueInt, delta);
-                    if(debugInfo.Length > 0)
+                    result &= operators[this.Operator](_oldValue, OldValueInt);
+                    resultValid = true;
+                    if (debugInfo.Length > 0)
                     {
                         debugInfo += " // ";
                     }
-                    debugInfo += $"{oldValue}{this.Operator}{this.OldValueInt} == {result}";
+                    debugInfo += $"{_oldValue}{this.Operator}{this.OldValueInt} == {result}";
                 }
 
-                if(debugInfo.Length <= 0)
+                if(!resultValid)
                 {
                     return false;
                 }
 
                 if (debug)
                 {
-                    Log.Info($"check {this.Address } = ({debugInfo}) == {result} (delta={delta})");
+                    Log.Info($"check {this.Address } = ({debugInfo}) == {result} (delta={_delta})");
                 }
 
                 return result;
@@ -507,10 +529,14 @@ namespace LiveSplit.UI.Components
 
                     CheckRunnableSetting();
 
+                    if (_autostart != null)
+                    {
+                        Log.Info($"auto start split detected: {_autostart.DebugDescription()}");
+                    }
                     Log.Info($"{_splits.Count} splits detected:");
                     foreach (var split in _splits)
                     {
-                        Log.Info($"- {split.Name}");
+                        Log.Info($"- {split.DebugDescription()}");
                     }
                 } catch (Exception e)
                 {
