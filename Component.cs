@@ -214,6 +214,7 @@ namespace LiveSplit.UI.Components
             public Settings Settings { get; set; }
             public Split Autostart { get; set; }
             public List<Split> Splits { get; set; }
+            public String MinVersion { get; set; } = "1.0.0";
         }
 
         public string ComponentName => "USB2SNES Auto Splitter";
@@ -475,6 +476,7 @@ namespace LiveSplit.UI.Components
         {
             if (!IsConfigReady())
             {
+                Disconnect();
                 _update_timer.Interval = 1000;
             }
             else if (_mystate != MyState.READY)
@@ -520,10 +522,15 @@ namespace LiveSplit.UI.Components
                     Log.Error($"Could not open split config file, check config file settings: {e.Message}");
                     _settings.ResetASLSettings();
                     return false;
-                }
+                }   
 
                 try
                 {
+                    if (Version.Parse(_game.MinVersion).CompareTo(Factory.CURRENT_VERSION) < 0)
+                    {
+                        throw new Exception($"Newer version of the auto splitter is required");
+                    }
+
                     _autostart = _game.Autostart;
                     SetSplitList();
 
@@ -559,7 +566,6 @@ namespace LiveSplit.UI.Components
         {
             var aslSettings = new ASLSettings();
             aslSettings.AddBasicSetting("resethardware");
-            aslSettings.AddBasicSetting("parallelsplitting");
             aslSettings.AddBasicSetting("debug");
             if (_autostart != null)
             {
