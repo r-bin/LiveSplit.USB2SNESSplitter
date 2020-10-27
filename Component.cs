@@ -40,7 +40,7 @@ namespace LiveSplit.UI.Components
         #region Init
 
         public const uint SD2SNES_WRAM_BASE_ADDRESS = 0xF50000;
-        public const uint DEFAULT_READ_SIZE = 64;
+        public const uint DEFAULT_READ_SIZE = 512;
 
         enum MyState
         {
@@ -59,86 +59,152 @@ namespace LiveSplit.UI.Components
         internal class Split
         {
             public Split Parent { get; set; }
-            public List<Split> Children { get; set; }
+            public List<Split> Splits { get; set; }
+            public List<Check> Checks { get; set; }
 
-            public bool Active { get; set; }
             public string Name { get; set; }
             public string Description { get; set; }
             public string Tooltip { get; set; }
-            public string Address { get; set; }
-            public string Value { get; set; }
-            public string Type { get; set; }
-            public string Operator { get; set; }
+            public bool Active { get; set; } = false;
             public int Repeat { get; set; } = 0;
-            public List<Split> More { get; set; }
-            public List<Split> Next { get; set; }
-            public int NextIndex { get; set; } = 0;
-
-            public uint AddressInt { get { return Address.ToFormattedUInt32(); } }
-            public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
-
-            public uint? PreviousValueInt { get; set; }
 
             public bool IsCategory()
             {
-                return Children?.Count > 0;
+                return Splits?.Count > 0;
             }
 
-            public bool Check(byte[] data, bool debug)
+            public bool Check(byte[] wram, byte[] data, bool debug)
+            {
+                if (debug)
+                {
+                    Log.Info($"split {this.Name}");
+                }
+
+                bool valid = true;
+
+                foreach (Check check in Checks)
+                {
+                    valid &= check.Perform(wram, data, debug);
+                }
+
+                return valid;
+            }
+
+            public void Reset()
+            {
+            }
+
+            public (uint Min, uint Max, uint Size) GetCheckRange()
+            {
+                var min = Checks.Min(c => c.AddressInt);
+                var max = Checks.Max(c => c.AddressInt + c.Size());
+
+                var size = max - min;
+
+                return (min, max, size);
+            }
+
+            public String DebugDescription()
+            {
+                return $"{ this.Description ?? this.Name ?? "<Missing Name>"} ({ this.Checks.Count} checks, { this.GetCheckRange().Size} bytes)";
+            }
+        }
+
+        internal class Check
+        {
+            public Split Parent { get; set; }
+
+            public string Address { get; set; }
+            public string Value { get; set; }
+            public string OldValue { get; set; }
+            public string Type { get; set; }
+            public string Operator { get; set; }
+
+            public uint AddressInt { get { return Address.ToFormattedUInt32(); } }
+            public uint ValueInt { get { return Value.ToFormattedUInt32(); } }
+            public uint OldValueInt { get { return OldValue.ToFormattedUInt32(); } }
+
+            private uint? _currentValue;
+            private uint? _oldValue;
+            private int? _delta;
+
+            public bool Perform(byte[] wram, byte[] data, bool debug)
             {
                 var types = new Dictionary<string, Func<byte[], uint>>()
                 {
                     { "byte", array => (uint)array[0] },
                     { "short", array => (uint)(array[0] + (array[1] << 8)) },
                 };
-                var operators = new Dictionary<string, Func<uint, Split, int?, bool>>()
+                var operators = new Dictionary<string, Func<uint?, uint?, bool>>()
                 {
-                    { "&", (v, s, d) => (v & s.ValueInt) == v },
-                    { "==", (v, s, d) => v == s.ValueInt },
-                    { ">", (v, s, d) => v > s.ValueInt },
-                    { "<", (v, s, d) => v < s.ValueInt },
-                    { ">=", (v, s, d) => v >= s.ValueInt },
-                    { "<=", (v, s, d) => v <= s.ValueInt },
-                    { "delta==", (v, s, d) => d.HasValue && d == s.ValueInt },
-                    { "delta===", (v, s, d) => d.HasValue && (((s.PreviousValueInt + s.ValueInt) & 0xffff) == v) },
+                    { "&", (value1, value2) => (value1 & value2) == value2 },
+                    { "==", (value1, value2) => value1 == value2 },
+                    { "!=", (value1, value2) => value1 != value2 },
+                    { ">", (value1, value2) => value1 > value2 },
+                    { "<", (value1, value2) => value1 < value2 },
+                    { ">=", (value1, value2) => value1 >= value2 },
+                    { "<=", (value1, value2) => value1 <= value2 },
+                    { "delta", (value1, value2) => _delta.HasValue && _delta == value2 },
+                    { "o-delta", (value1, value2) => _oldValue.HasValue && (((int)_oldValue + (int)ValueInt) & 0xffff) == _currentValue },
                 };
 
                 if (this.Type == null || !types.TryGetValue(this.Type, out Func<byte[], uint> type))
                 {
                     type = types["short"];
                 }
-                uint value = type(data);
-
-                int? delta = null;
-                if (this.PreviousValueInt.HasValue)
+                _currentValue = type(data.Skip((int) this.AddressInt).ToArray());
+                if(wram != null)
                 {
-                    delta = (int)value - (int)this.PreviousValueInt;
+                    _oldValue = type(wram.Skip((int)this.AddressInt).ToArray());
                 }
 
-                bool result = operators[this.Operator](value, this, delta);
+                if (_oldValue.HasValue)
+                {
+                    _delta = (int)_currentValue - (int)_oldValue;
+                }
+
+                bool result = true;
+                bool resultValid = false;
+
+                String debugInfo = "";
+                if (Value != null)
+                {
+                    result &= operators[this.Operator](_currentValue, ValueInt);
+                    resultValid = true;
+                    debugInfo += $"{_currentValue}{this.Operator}{this.ValueInt} == {result}";
+                }
+                if (OldValue != null && _oldValue.HasValue)
+                {
+                    result &= operators[this.Operator](_oldValue, OldValueInt);
+                    resultValid = true;
+                    if (debugInfo.Length > 0)
+                    {
+                        debugInfo += " // ";
+                    }
+                    debugInfo += $"{_oldValue}{this.Operator}{this.OldValueInt} == {result}";
+                }
+
+                if(!resultValid)
+                {
+                    return false;
+                }
 
                 if (debug)
                 {
-                    var nextString = "-";
-                    if (this.Next?.Count() > 0)
-                    {
-                        nextString = $"{this.NextIndex + 1}/{this.Next?.Count() + 1}";
-                    }
-                    else if (this.Parent != null)
-                    {
-                        nextString = $"{this.Parent.NextIndex + 1}/{this.Parent.Next?.Count() + 1}";
-                    }
-                    Log.Info($"split[{(this.Parent != null ? this.Parent.Name : this.Name)}][{nextString}] {this.Address } = ({value}{this.Operator}{this.ValueInt}) == {result} (delta={delta}, prev={this.PreviousValueInt})");
+                    Log.Info($"check {this.Address } = ({debugInfo}) == {result} (delta={_delta})");
                 }
-
-                this.PreviousValueInt = value;
 
                 return result;
             }
 
-            internal void Reset()
+            internal uint Size()
             {
-                this.NextIndex = 0;
+                switch (this.Type)
+                {
+                    case "byte": return 1;
+                    case "short":
+                    default: return 2;
+                }
             }
         }
 
@@ -148,6 +214,7 @@ namespace LiveSplit.UI.Components
             public Settings Settings { get; set; }
             public Split Autostart { get; set; }
             public List<Split> Splits { get; set; }
+            public String MinVersion { get; set; } = "1.0.0";
         }
 
         public string ComponentName => "USB2SNES Auto Splitter";
@@ -188,6 +255,7 @@ namespace LiveSplit.UI.Components
         private Split _autostart;
         private List<Split> _splits;
         private bool _inTimer;
+        private byte[] _wram;
 
         private Color _ok_color = Color.FromArgb(0, 128, 0);
         private Color _error_color = Color.FromArgb(128, 0, 0);
@@ -221,7 +289,7 @@ namespace LiveSplit.UI.Components
             HorizontalWidth = 3;
             VerticalHeight = 3;
         }
-
+        
         public USB2SNESComponent(LiveSplitState state)
         {
             Init(state, new USB2SnesW.USB2SnesW());
@@ -408,6 +476,7 @@ namespace LiveSplit.UI.Components
         {
             if (!IsConfigReady())
             {
+                Disconnect();
                 _update_timer.Interval = 1000;
             }
             else if (_mystate != MyState.READY)
@@ -418,7 +487,24 @@ namespace LiveSplit.UI.Components
             else
             {
                 _update_timer.Interval = 33;
-                await CheckSplits();
+                List<Split> splits = GenerateSplitList();
+
+                if (splits == null)
+                {
+                    return;
+                }
+
+                if (await CheckSplits(splits, _state.CurrentSplitIndex))
+                {
+                    if (splits.Contains(_autostart))
+                    {
+                        _model.Start();
+                    }
+                    else
+                    {
+                        _model.Split();
+                    }
+                }
             }
         }
 
@@ -436,19 +522,28 @@ namespace LiveSplit.UI.Components
                     Log.Error($"Could not open split config file, check config file settings: {e.Message}");
                     _settings.ResetASLSettings();
                     return false;
-                }
+                }   
 
                 try
                 {
+                    if (Version.Parse(_game.MinVersion).CompareTo(Factory.CURRENT_VERSION) < 0)
+                    {
+                        throw new Exception($"Newer version of the auto splitter is required");
+                    }
+
                     _autostart = _game.Autostart;
                     SetSplitList();
 
                     CheckRunnableSetting();
 
+                    if (_autostart != null)
+                    {
+                        Log.Info($"auto start split detected: {_autostart.DebugDescription()}");
+                    }
                     Log.Info($"{_splits.Count} splits detected:");
                     foreach (var split in _splits)
                     {
-                        Log.Info($"- {split.Name}");
+                        Log.Info($"- {split.DebugDescription()}");
                     }
                 } catch (Exception e)
                 {
@@ -491,7 +586,7 @@ namespace LiveSplit.UI.Components
                 }
                 else
                 {
-                    foreach (Split s in split.Children)
+                    foreach (Split s in split.Splits)
                     {
                         _splits.AddRange(Enumerable.Repeat(s, s.Repeat + 1).ToList());
                         aslSettings.AddSetting(s.Name, s.Active, s.Description, split.Name);
@@ -535,77 +630,59 @@ namespace LiveSplit.UI.Components
             return _do_reload;
         }
 
-        private async Task CheckSplits()
+        #endregion
+
+        private List<Split> GenerateSplitList()
         {
-            Split split = null;
             if (_aslSettings.GetBasicSettingValue("start") && _state.CurrentPhase == TimerPhase.NotRunning && _autostart != null)
             {
-                split = _autostart;
+                return new List<Split>() { _autostart };
             }
             else if (_aslSettings.GetBasicSettingValue("split") && _state.CurrentPhase == TimerPhase.Running)
             {
-                var splits = _splits.Where(s => _aslSettings.OrderedSettings.Where(s2 => s.Name == s2.Id).Any(s2 => s2.Value && (s2.Parent == null || (_aslSettings.OrderedSettings.Where(s3 => s3.Id == s2.Parent).First()?.Value ?? false))));
-                if (splits.Count() > _state.CurrentSplitIndex)
-                {
-                    split = splits.ToArray()[_state.CurrentSplitIndex];
-                }
+                return _splits.Where(split => _aslSettings.OrderedSettings
+                    .Where(setting => split.Name == setting.Id)
+                    .Any(setting => setting.Value && (setting.Parent == null || (_aslSettings.OrderedSettings.Where(s3 => s3.Id == setting.Parent).First()?.Value ?? false)))
+                    ).ToList();
             }
 
-            if (split == null)
-            {
-                return;
-            }
-
-            var orignSplit = split;
-            if (split.Next != null && split.NextIndex != 0)
-            {
-                split = split.Next[split.NextIndex - 1];
-                split.Parent = orignSplit;
-            }
-            bool ok = await CheckSplit(split);
-            if (orignSplit.Next != null && ok)
-            {
-                if (orignSplit.NextIndex < orignSplit.Next.Count())
-                {
-                    orignSplit.NextIndex++;
-                    ok = false;
-                }
-                else
-                {
-                    orignSplit.NextIndex = 0;
-                }
-            }
-            if (split.More != null)
-            {
-                foreach (var moreSplit in split.More)
-                {
-                    if (!ok)
-                    {
-                        break;
-                    }
-                    ok = ok && await CheckSplit(moreSplit);
-                }
-            }
-
-            if (ok)
-            {
-                Log.Info($"split[{(orignSplit.Name)}] {orignSplit.Address}{orignSplit.Operator}{orignSplit.ValueInt}");
-
-                if (orignSplit == _autostart)
-                {
-                    _model.Start();
-                } else {
-                    _model.Split();
-                }
-            }
+            return null;
         }
 
-        async Task<bool> CheckSplit(Split split)
+        private async Task<bool> CheckSplits(List<Split> splits, int currentSplitIndex)
         {
-            byte[] data;
+            if(currentSplitIndex < 0)
+            {
+                currentSplitIndex = 0;
+            }
+
+            if(splits.Count <= currentSplitIndex)
+            {
+                return false;
+            }
+
+            var split = splits[currentSplitIndex];
+
+            bool shouldSplit = await CheckSplit(split.Checks);
+
+            if (shouldSplit)
+            {
+                Log.Info($"split[{(split.Name)}] {shouldSplit}");
+            }
+
+            return shouldSplit;
+        }
+        async Task<bool> CheckSplit(List<Check> checks)
+        {
+            byte[] data = null;
+
+            var min = checks.Min(c => c.AddressInt);
+            var max = checks.Max(c => c.AddressInt + c.Size());
+            var size = max - min;
+
             try
             {
-                data = await _usb2snes.GetAddress(split.AddressInt.ToWramAddress(), DEFAULT_READ_SIZE);
+                data = await _usb2snes.GetAddress(min.ToWramAddress(), size);
             }
             catch
             {
@@ -613,16 +690,31 @@ namespace LiveSplit.UI.Components
                 Disconnect();
                 return false;
             }
-            if (data.Count() == 0)
+            if (data?.Count() != size)
             {
-                Console.WriteLine("Get address failed to return result");
+                Console.WriteLine($"Get address returned ${data.Count()} instead of ${size} bytes");
                 Disconnect();
                 return false;
             }
-            return split.Check(data, _aslSettings.GetBasicSettingValue("debug"));
-        }
 
-        #endregion
+            byte[] dataWithOffset = new byte[0x1ffff];
+            data.CopyTo(dataWithOffset, min);
+
+            bool result = true;
+
+            foreach (Check check in checks)
+            {
+                result &= check.Perform(_wram, dataWithOffset, _aslSettings.GetBasicSettingValue("debug"));
+            }
+
+            if (_wram == null)
+            {
+                _wram = new byte[0x1ffff];
+            }
+            data.CopyTo(_wram, min);
+
+            return result;
+        }
 
         #region Connection Bar Drawing
 
