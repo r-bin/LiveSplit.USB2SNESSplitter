@@ -32,6 +32,7 @@
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.flowLayoutPanel3 = new System.Windows.Forms.FlowLayoutPanel();
             this.checkboxResetHardware = new System.Windows.Forms.CheckBox();
+            this.checkboxParallelSplitting = new System.Windows.Forms.CheckBox();
             this.checkboxDebug = new System.Windows.Forms.CheckBox();
             this.labelScriptPath = new System.Windows.Forms.Label();
             this.btnSelectFile = new System.Windows.Forms.Button();
@@ -48,6 +49,7 @@
             this.lblGameVersion = new System.Windows.Forms.Label();
             this.labelOptions = new System.Windows.Forms.Label();
             this.labelCustomSettings = new System.Windows.Forms.Label();
+            this.treeCustomSettings = new LiveSplit.UI.Components.NewTreeView();
             this.labelDevice = new System.Windows.Forms.Label();
             this.btnDetectDevice = new System.Windows.Forms.Button();
             this.txtDevice = new System.Windows.Forms.TextBox();
@@ -70,7 +72,6 @@
             this.cmiCollapseTreeToSelection2 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.resetSettingToDefaultToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.treeCustomSettings = new LiveSplit.UI.Components.NewTreeView();
             this.tableLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel3.SuspendLayout();
             this.flowLayoutPanel1.SuspendLayout();
@@ -118,6 +119,7 @@
             this.flowLayoutPanel3.AutoSize = true;
             this.tableLayoutPanel1.SetColumnSpan(this.flowLayoutPanel3, 2);
             this.flowLayoutPanel3.Controls.Add(this.checkboxResetHardware);
+            this.flowLayoutPanel3.Controls.Add(this.checkboxParallelSplitting);
             this.flowLayoutPanel3.Controls.Add(this.checkboxDebug);
             this.flowLayoutPanel3.Location = new System.Drawing.Point(79, 32);
             this.flowLayoutPanel3.Name = "flowLayoutPanel3";
@@ -135,10 +137,21 @@
             this.checkboxResetHardware.UseVisualStyleBackColor = true;
             this.checkboxResetHardware.CheckedChanged += new System.EventHandler(this.methodCheckbox_CheckedChanged);
             // 
+            // checkboxParallelSplitting
+            // 
+            this.checkboxParallelSplitting.Enabled = false;
+            this.checkboxParallelSplitting.Location = new System.Drawing.Point(114, 3);
+            this.checkboxParallelSplitting.Name = "checkboxParallelSplitting";
+            this.checkboxParallelSplitting.Size = new System.Drawing.Size(100, 17);
+            this.checkboxParallelSplitting.TabIndex = 1;
+            this.checkboxParallelSplitting.Text = "Parallel Splitting";
+            this.checkboxParallelSplitting.UseVisualStyleBackColor = true;
+            this.checkboxParallelSplitting.CheckedChanged += new System.EventHandler(this.methodCheckbox_CheckedChanged);
+            // 
             // checkboxDebug
             // 
             this.checkboxDebug.Enabled = false;
-            this.checkboxDebug.Location = new System.Drawing.Point(114, 3);
+            this.checkboxDebug.Location = new System.Drawing.Point(220, 3);
             this.checkboxDebug.Name = "checkboxDebug";
             this.checkboxDebug.Size = new System.Drawing.Size(60, 17);
             this.checkboxDebug.TabIndex = 0;
@@ -308,6 +321,22 @@
             this.labelCustomSettings.Size = new System.Drawing.Size(59, 13);
             this.labelCustomSettings.TabIndex = 13;
             this.labelCustomSettings.Text = "Advanced:";
+            // 
+            // treeCustomSettings
+            // 
+            this.treeCustomSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.treeCustomSettings.CheckBoxes = true;
+            this.tableLayoutPanel1.SetColumnSpan(this.treeCustomSettings, 2);
+            this.treeCustomSettings.Location = new System.Drawing.Point(79, 119);
+            this.treeCustomSettings.Name = "treeCustomSettings";
+            this.treeCustomSettings.ShowNodeToolTips = true;
+            this.treeCustomSettings.Size = new System.Drawing.Size(380, 388);
+            this.treeCustomSettings.TabIndex = 14;
+            this.treeCustomSettings.BeforeCheck += new System.Windows.Forms.TreeViewCancelEventHandler(this.settingsTree_BeforeCheck);
+            this.treeCustomSettings.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.settingsTree_AfterCheck);
+            this.treeCustomSettings.NodeMouseClick += new System.Windows.Forms.TreeNodeMouseClickEventHandler(this.settingsTree_NodeMouseClick);
             // 
             // labelDevice
             // 
@@ -479,22 +508,6 @@
             this.resetSettingToDefaultToolStripMenuItem.Text = "Reset Setting to Default";
             this.resetSettingToDefaultToolStripMenuItem.Click += new System.EventHandler(this.cmiResetSettingToDefault_Click);
             // 
-            // treeCustomSettings
-            // 
-            this.treeCustomSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.treeCustomSettings.CheckBoxes = true;
-            this.tableLayoutPanel1.SetColumnSpan(this.treeCustomSettings, 2);
-            this.treeCustomSettings.Location = new System.Drawing.Point(79, 119);
-            this.treeCustomSettings.Name = "treeCustomSettings";
-            this.treeCustomSettings.ShowNodeToolTips = true;
-            this.treeCustomSettings.Size = new System.Drawing.Size(380, 388);
-            this.treeCustomSettings.TabIndex = 14;
-            this.treeCustomSettings.BeforeCheck += new System.Windows.Forms.TreeViewCancelEventHandler(this.settingsTree_BeforeCheck);
-            this.treeCustomSettings.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.settingsTree_AfterCheck);
-            this.treeCustomSettings.NodeMouseClick += new System.Windows.Forms.TreeNodeMouseClickEventHandler(this.settingsTree_NodeMouseClick);
-            // 
             // ComponentSettings
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -560,5 +573,6 @@
         private System.Windows.Forms.CheckBox checkboxResetHardware;
         private System.Windows.Forms.CheckBox checkboxDebug;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.CheckBox checkboxParallelSplitting;
     }
 }
